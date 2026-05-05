@@ -133,6 +133,11 @@ svg { flex-shrink: 0; }
 }
 :is(.thinking-header:hover .thinking-chevron, .tc-item-header:hover .tc-item-chevron, .tr-summary:hover .tr-chevron, .group-header:hover .group-chevron) { color: var(--text2); }
 
+:is(.thinking-label, .tui-name, .tc-item-name, .tr-tool-name, .tool-card-name, .server-group-name, .group-label) {
+  padding: 4px 0px;
+  margin: -4px 0px;
+}
+
 :is(.thinking-icon, .tool-icon, .group-icon) { display: inline-flex; align-items: center; opacity: .7; }
 :is(.thinking-body, .tc-item-args, .tr-body) {
   margin: 8px 0 0;
