@@ -501,7 +501,7 @@ svg { flex-shrink: 0; }
   gap: 5px;
   padding: 5px 9px 5px 8px;
   border: none;
-  border-radius: 20px;
+  border-radius: 8px;
   background: none;
   color: var(--text2);
   font-family: var(--font-mono);
