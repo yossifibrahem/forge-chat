@@ -6,6 +6,13 @@ import { $, createElement, remove, setVisible } from './dom.js';
 import { ICONS } from './icons.js';
 import { state } from './state.js';
 
+function getToolIconSvg(toolName) {
+  const tool = state.mcpTools.find(t => t.name === toolName);
+  if (!tool) return ICONS.plug;
+  const iconKey = state.mcpServerSettings[tool.server]?.icon || 'plug';
+  return ICONS[iconKey] || ICONS.plug;
+}
+
 const SUGGESTION_CHIPS = [
   { icon: ICONS.chipCode,       label: 'Code',       prompt: 'Help me write some code' },
   { icon: ICONS.chipPencil,      label: 'Write',      prompt: 'Help me write something' },
@@ -587,7 +594,7 @@ function appendToolResultInline(toolName, args, result) {
   strip.innerHTML = `
     <button class="tr-summary">
       <span class="tr-chevron">${expanded ? ICONS.chevronDown : ICONS.chevronRight}</span>
-      <span class="tool-icon">${ICONS.plug}</span>
+      <span class="tool-icon">${getToolIconSvg(toolName)}</span>
       <span class="tr-tool-name">${escapeHtml(toolName)}</span>
     </button>
     <div class="tr-body" style="${expanded ? '' : 'display:none'}">${createToolResultBody(args, result)}</div>`;
@@ -634,7 +641,7 @@ export function createToolStrip(toolName) {
   const strip = createElement('div', { className: 'tool-strip tool-strip-using' });
   strip.dataset.toolName = toolName;
   strip.innerHTML = `
-    <span class="tool-icon">${ICONS.plug}</span>
+    <span class="tool-icon">${getToolIconSvg(toolName)}</span>
     <span>using <span class="tui-name">${escapeHtml(toolName)}</span></span>
     <span class="thinking-pulse"></span>`;
   row.appendChild(strip);
@@ -654,7 +661,7 @@ export function toolStripSetApproval(strip, call) {
       <div class="tc-item-row">
         <button class="tc-item-header">
           <span class="tc-item-chevron">${ICONS.chevronDown}</span>
-          <span class="tool-icon">${ICONS.plug}</span>
+          <span class="tool-icon">${getToolIconSvg(call.function.name)}</span>
           <span class="tc-item-name">${escapeHtml(call.function.name)}</span>
           ${hasArgs ? '' : '<span class="tc-item-noargs">no arguments</span>'}
         </button>
@@ -711,10 +718,10 @@ export function toolStripSetRunning(strip, args = {}) {
       ${hasArgs
         ? `<button class="tc-item-header">
              <span class="tc-item-chevron">${ICONS.chevronRight}</span>
-             <span class="tool-icon">${ICONS.plug}</span>
+             <span class="tool-icon">${getToolIconSvg(name)}</span>
              <span>running <span class="tui-name">${escapeHtml(name)}</span></span>
            </button>`
-        : `<span class="tool-icon">${ICONS.plug}</span>
+        : `<span class="tool-icon">${getToolIconSvg(name)}</span>
            <span>running <span class="tui-name">${escapeHtml(name)}</span></span>`}
       <span class="thinking-pulse"></span>
     </div>
@@ -737,7 +744,7 @@ export function toolStripFinalize(strip, toolName, args, result) {
   strip.innerHTML = `
     <button class="tr-summary">
       <span class="tr-chevron">${expanded ? ICONS.chevronDown : ICONS.chevronRight}</span>
-      <span class="tool-icon">${ICONS.plug}</span>
+      <span class="tool-icon">${getToolIconSvg(toolName)}</span>
       <span class="tr-tool-name">${escapeHtml(toolName)}</span>
     </button>
     <div class="tr-body" style="${expanded ? '' : 'display:none'}">${createToolResultBody(args, result)}</div>`;

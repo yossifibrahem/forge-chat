@@ -783,6 +783,39 @@ svg { flex-shrink: 0; }
 .server-group .tool-card { margin-bottom: 5px; border-color: var(--border); background: var(--bg); }
 .server-group .tool-card:last-child { margin-bottom: 4px; }
 
+/* ─── Per-server icon picker ──────────────────────────────────────────────── */
+.server-icon-wrap { position: relative; flex-shrink: 0; order: 0; margin-right: 8px; }
+.server-group-name { order: 1; }
+.server-group-controls { order: 2; margin-left: auto; }
+.server-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface2); color: var(--text2);
+  cursor: pointer; transition: border-color .15s, background .15s, color .15s;
+}
+.server-icon-btn:hover { border-color: var(--accent); background: var(--surface3); color: var(--accent); }
+.server-icon-btn .server-icon-current { display: inline-flex; pointer-events: none; }
+.server-icon-btn svg { width: 14px; height: 14px; }
+
+.icon-picker-dropdown {
+  position: absolute; top: calc(100% + 5px); left: 0; z-index: 120;
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 6px; width: max-content; max-width: 200px;
+  background: var(--surface3); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.35);
+}
+.icon-option {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--text2);
+  cursor: pointer; transition: border-color .12s, background .12s, color .12s;
+}
+.icon-option svg { width: 15px; height: 15px; pointer-events: none; }
+.icon-option:hover { background: var(--surface2); color: var(--text); border-color: var(--border); }
+.icon-option.selected { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-border); }
+
 /* ─── Inline message editing ──────────────────────────────────────────────── */
 .msg-edit-wrap { margin-top: 6px; display: flex; flex-direction: column; gap: 8px; }
 .msg-edit-textarea { min-height: 60px; padding: 10px 12px; resize: vertical; border-color: var(--accent); font-size: .9rem; line-height: 1.6; font-family: var(--font-mono); }

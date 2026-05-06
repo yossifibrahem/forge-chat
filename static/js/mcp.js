@@ -5,6 +5,7 @@ import { state, STORAGE_KEYS } from './state.js';
 import { storage } from './storage.js';
 import { escapeHtml }   from './renderer.js';
 import { showStatus, showToast } from './ui.js';
+import { ICONS, MCP_ICON_OPTIONS } from './icons.js';
 
 // ── Server settings helpers ───────────────────────────────────────────────────
 
@@ -18,7 +19,10 @@ function saveServerSettings() {
 
 function getServerSetting(serverName) {
   if (!state.mcpServerSettings[serverName]) {
-    state.mcpServerSettings[serverName] = { enabled: true, autoApprove: false };
+    state.mcpServerSettings[serverName] = { enabled: true, autoApprove: false, icon: 'plug' };
+  }
+  if (!state.mcpServerSettings[serverName].icon) {
+    state.mcpServerSettings[serverName].icon = 'plug';
   }
   return state.mcpServerSettings[serverName];
 }
@@ -29,6 +33,11 @@ export function isServerEnabled(serverName) {
 
 export function isServerAutoApprove(serverName) {
   return getServerSetting(serverName).autoApprove === true;
+}
+
+/** Returns the icon key (e.g. 'plug', 'mcpWebSearch') saved for a server. */
+export function getServerIconKey(serverName) {
+  return getServerSetting(serverName).icon || 'plug';
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -88,9 +97,29 @@ function buildToggleHtml(server, action, label, isOn) {
     </label>`;
 }
 
+function buildIconPickerHtml(server, currentIconKey) {
+  const optionsHtml = MCP_ICON_OPTIONS.map(opt => `
+    <button class="icon-option${currentIconKey === opt.key ? ' selected' : ''}"
+            data-server="${escapeHtml(server)}" data-icon="${opt.key}"
+            title="${escapeHtml(opt.label)}" aria-label="${escapeHtml(opt.label)}">
+      ${ICONS[opt.key]}
+    </button>`).join('');
+  return `
+    <div class="server-icon-wrap" data-server="${escapeHtml(server)}">
+      <button class="server-icon-btn" data-server="${escapeHtml(server)}"
+              title="Change server icon" aria-label="Change server icon">
+        <span class="server-icon-current">${ICONS[currentIconKey] || ICONS.plug}</span>
+      </button>
+      <div class="icon-picker-dropdown" style="display:none">
+        ${optionsHtml}
+      </div>
+    </div>`;
+}
+
 function buildServerGroupHtml(server, tools, settings) {
-  const disabledCls = settings.enabled ? '' : ' server-disabled';
-  const toolsHtml   = tools.map(tool => `
+  const disabledCls   = settings.enabled ? '' : ' server-disabled';
+  const currentIcon   = settings.icon || 'plug';
+  const toolsHtml     = tools.map(tool => `
     <div class="tool-card">
       <div class="tool-card-header">
         <span class="tool-card-name">${escapeHtml(tool.name)}</span>
@@ -101,6 +130,7 @@ function buildServerGroupHtml(server, tools, settings) {
   return `
     <div class="server-group${disabledCls}" data-server="${escapeHtml(server)}">
       <div class="server-group-header">
+        ${buildIconPickerHtml(server, currentIcon)}
         <span class="server-group-name">${escapeHtml(server)}</span>
         <div class="server-group-controls">
           ${buildToggleHtml(server, 'enabled',     'Enable / disable all tools from this server', settings.enabled)}
@@ -141,6 +171,39 @@ function renderToolList() {
       renderToolList();
     });
   });
+
+  // Icon picker: toggle dropdown visibility
+  container.querySelectorAll('.server-icon-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const wrap    = btn.closest('.server-icon-wrap');
+      const dropdown = wrap.querySelector('.icon-picker-dropdown');
+      const isOpen  = dropdown.style.display !== 'none';
+      // Close all open dropdowns first
+      container.querySelectorAll('.icon-picker-dropdown').forEach(d => { d.style.display = 'none'; });
+      if (!isOpen) dropdown.style.display = 'flex';
+    });
+  });
+
+  // Icon picker: select an icon option
+  container.querySelectorAll('.icon-option').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const setting = getServerSetting(btn.dataset.server);
+      setting.icon = btn.dataset.icon;
+      saveServerSettings();
+      // Dispatch a custom event so renderer.js can update live tool strips
+      document.dispatchEvent(new CustomEvent('mcp:icon-changed', {
+        detail: { server: btn.dataset.server, iconKey: btn.dataset.icon },
+      }));
+      renderToolList();
+    });
+  });
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', () => {
+    container.querySelectorAll('.icon-picker-dropdown').forEach(d => { d.style.display = 'none'; });
+  }, { once: true });
 }
 
 // ── Tool execution ────────────────────────────────────────────────────────────
