@@ -439,8 +439,8 @@ export function appendThinkingBlock(reasoningText) {
 }
 
 function appendContentParts(contentEl, content) {
-  // Multipart with images: { text, imageUrls: ['/api/images/...', ...] }
-  if (content && typeof content === 'object' && !Array.isArray(content) && 'imageUrls' in content) {
+  // Multipart attachments: { text, imageUrls: [...], files: [...] }
+  if (content && typeof content === 'object' && !Array.isArray(content) && ('imageUrls' in content || 'files' in content)) {
     if (content.text) {
       const textChunk = createElement('div');
       applyMarkdown(textChunk, content.text);
@@ -456,6 +456,17 @@ function appendContentParts(contentEl, content) {
         imgWrap.appendChild(img);
       });
       contentEl.appendChild(imgWrap);
+    }
+    if (content.files?.length) {
+      const fileWrap = createElement('div', { className: 'msg-files' });
+      content.files.forEach(file => {
+        const chip = createElement('div', { className: 'msg-file-chip' });
+        chip.title = file.path ? `Available to tools at ${file.path}` : '';
+        chip.innerHTML = `${ICONS.file}<span class="msg-file-name"></span>`;
+        chip.querySelector('.msg-file-name').textContent = file.name || 'file';
+        fileWrap.appendChild(chip);
+      });
+      contentEl.appendChild(fileWrap);
     }
     return;
   }
@@ -477,7 +488,7 @@ function appendContentParts(contentEl, content) {
 
 function getRawText(content) {
   if (typeof content === 'string') return content;
-  if (content && typeof content === 'object' && !Array.isArray(content) && 'imageUrls' in content) return content.text || '';
+  if (content && typeof content === 'object' && !Array.isArray(content) && ('imageUrls' in content || 'files' in content)) return content.text || '';
   if (!Array.isArray(content)) return '';
   return content.map(part => part.text || '').join('\n');
 }

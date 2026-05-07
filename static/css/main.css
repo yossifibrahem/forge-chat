@@ -1005,3 +1005,73 @@ html.hide-suggestion-chips #suggestions-bar { display: none !important; }
 }
 
 .field select:focus { border-color: var(--accent-border); outline: none; }
+
+/* Pending regular file attachments */
+.file-preview-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 260px;
+  min-height: 42px;
+  padding: 8px 28px 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface2);
+}
+.file-preview-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text2);
+  flex: 0 0 auto;
+}
+.file-preview-icon svg { width: 18px; height: 18px; }
+.file-preview-meta { min-width: 0; }
+.file-preview-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: .78rem;
+}
+.file-preview-size {
+  color: var(--text3);
+  font-size: .68rem;
+  margin-top: 1px;
+}
+
+/* Rendered file attachments in chat messages */
+.msg-files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.msg-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: .78rem;
+}
+.msg-file-chip svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.msg-file-name {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msg-file-chip code {
+  color: var(--text3);
+  font-size: .72rem;
+  white-space: nowrap;
+}

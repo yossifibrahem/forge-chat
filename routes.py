@@ -7,9 +7,11 @@ module, and return JSON.  No business logic lives here.
 from __future__ import annotations
 
 import json
+import os
 import re
 import threading
 import uuid
+from pathlib import Path
 
 from flask import Blueprint, jsonify, render_template, request, send_file
 from openai import OpenAI
@@ -165,6 +167,80 @@ def call_mcp_tool():
         return jsonify({"error": str(exc)}), 400
     return jsonify({"result": result})
 
+
+
+# ── Container file uploads ────────────────────────────────────────────────────
+
+_SAFE_UPLOAD_NAME = re.compile(r"[^A-Za-z0-9._ -]+")
+_MAX_UPLOAD_BYTES = int(os.getenv("LUMEN_MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
+
+
+def _safe_upload_name(name: str) -> str:
+    """Return a filesystem-safe basename while preserving readable filenames."""
+    cleaned = _SAFE_UPLOAD_NAME.sub("_", Path(name or "file").name).strip(" ._")
+    return cleaned or "file"
+
+
+def _unique_path(directory: Path, filename: str) -> Path:
+    candidate = directory / filename
+    if not candidate.exists():
+        return candidate
+
+    stem = candidate.stem or "file"
+    suffix = candidate.suffix
+    for index in range(1, 1000):
+        candidate = directory / f"{stem}-{index}{suffix}"
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError(f"Could not create a unique filename for {filename!r}")
+
+
+@blueprint.route("/api/conversations/<conv_id>/files", methods=["POST"])
+def upload_conversation_files(conv_id: str):
+    """Save uploaded files into the conversation workspace mounted at /workspace."""
+    if not store.load(conv_id):
+        return jsonify({"error": "Conversation not found"}), 404
+
+    files = request.files.getlist("files")
+    if not files:
+        return jsonify({"error": "No files uploaded"}), 400
+
+    upload_dir = store.working_directory(conv_id) / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    saved: list[dict] = []
+    for item in files:
+        if not item or not item.filename:
+            continue
+
+        filename = _safe_upload_name(item.filename)
+        target = _unique_path(upload_dir, filename)
+
+        total = 0
+        with target.open("wb") as fh:
+            while True:
+                chunk = item.stream.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > _MAX_UPLOAD_BYTES:
+                    fh.close()
+                    target.unlink(missing_ok=True)
+                    return jsonify({
+                        "error": f"File '{filename}' exceeds the upload limit of {_MAX_UPLOAD_BYTES} bytes"
+                    }), 413
+                fh.write(chunk)
+
+        saved.append({
+            "name": filename,
+            "size": total,
+            "path": f"/workspace/uploads/{target.name}",
+            "host_path": str(target),
+        })
+
+    if not saved:
+        return jsonify({"error": "No valid files uploaded"}), 400
+    return jsonify({"files": saved})
 
 # ── Images ────────────────────────────────────────────────────────────────────
 

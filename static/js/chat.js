@@ -18,19 +18,34 @@ import { persistConversation, createNewConversation } from './conversations.js';
 let turnAbortController = null;
 let turnCancelled = false;
 
-// ── Attached images (pending send) ────────────────────────────────────────────
+// ── Pending attachments ──────────────────────────────────────────────────────
 
 let pendingImages = [];
 // Each entry: { previewUrl: string, uploadPromise: Promise<{ref, url, mediaType}|null> }
+let pendingFiles = [];
+// Each entry: { file: File, name: string, size: number }
 
 function getImagePreviewBar() { return document.getElementById('image-preview-bar'); }
+
+function formatBytes(bytes = 0) {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes / 1024;
+  let unit = units.shift();
+  while (value >= 1024 && units.length) {
+    value /= 1024;
+    unit = units.shift();
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${unit}`;
+}
 
 function refreshImagePreviewBar() {
   const bar = getImagePreviewBar();
   if (!bar) return;
-  if (!pendingImages.length) { bar.hidden = true; bar.innerHTML = ''; return; }
+  if (!pendingImages.length && !pendingFiles.length) { bar.hidden = true; bar.innerHTML = ''; return; }
   bar.hidden = false;
   bar.innerHTML = '';
+
   pendingImages.forEach((img, idx) => {
     const wrap = document.createElement('div');
     wrap.className = 'img-preview-wrap';
@@ -48,6 +63,26 @@ function refreshImagePreviewBar() {
 
     wrap.querySelector('.img-preview-remove').addEventListener('click', () => {
       pendingImages.splice(idx, 1);
+      refreshImagePreviewBar();
+    });
+    bar.appendChild(wrap);
+  });
+
+  pendingFiles.forEach((entry, idx) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'file-preview-wrap';
+    wrap.innerHTML = `
+      <div class="file-preview-icon">${ICONS.file || '📄'}</div>
+      <div class="file-preview-meta">
+        <div class="file-preview-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</div>
+        <div class="file-preview-size">${formatBytes(entry.size)}</div>
+      </div>
+      <button class="img-preview-remove" title="Remove">
+        ${ICONS.close}
+      </button>`;
+
+    wrap.querySelector('.img-preview-remove').addEventListener('click', () => {
+      pendingFiles.splice(idx, 1);
       refreshImagePreviewBar();
     });
     bar.appendChild(wrap);
@@ -76,6 +111,30 @@ async function uploadImage(dataUrl, mediaType) {
   }
 }
 
+async function uploadConversationFiles(convId, entries) {
+  if (!entries.length) return [];
+  const form = new FormData();
+  entries.forEach(entry => form.append('files', entry.file, entry.name));
+
+  const response = await fetch(`/api/conversations/${encodeURIComponent(convId)}/files`, {
+    method: 'POST',
+    body: form,
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.error) {
+    throw new Error(result.error || `Failed to upload file(s) (${response.status})`);
+  }
+  return Array.isArray(result.files) ? result.files : [];
+}
+
+function addRegularFiles(files) {
+  for (const file of Array.from(files)) {
+    if (!file || file.type.startsWith('image/')) continue;
+    pendingFiles.push({ file, name: file.name || 'file', size: file.size || 0 });
+  }
+  refreshImagePreviewBar();
+}
+
 async function addImageFiles(files) {
   for (const file of Array.from(files)) {
     if (!file.type.startsWith('image/')) continue;
@@ -94,14 +153,24 @@ export function initImageAttachments() {
   const textarea   = document.getElementById('user-input');
 
   attachBtn?.addEventListener('click', () => imageInput?.click());
-  imageInput?.addEventListener('change', e => { addImageFiles(e.target.files); imageInput.value = ''; });
+  imageInput?.addEventListener('change', e => {
+    const files = Array.from(e.target.files || []);
+    addImageFiles(files.filter(file => file.type.startsWith('image/')));
+    addRegularFiles(files.filter(file => !file.type.startsWith('image/')));
+    imageInput.value = '';
+  });
 
   textarea?.addEventListener('paste', e => {
     const items = Array.from(e.clipboardData?.items || []);
-    const imageItems = items.filter(i => i.type.startsWith('image/'));
-    if (!imageItems.length) return;
+    const fileItems = items.filter(i => i.kind === 'file');
+    if (!fileItems.length) return;
+    const files = fileItems.map(i => i.getAsFile()).filter(Boolean);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    const regularFiles = files.filter(file => !file.type.startsWith('image/'));
+    if (!imageFiles.length && !regularFiles.length) return;
     e.preventDefault();
-    addImageFiles(imageItems.map(i => i.getAsFile()));
+    addImageFiles(imageFiles);
+    addRegularFiles(regularFiles);
   });
 }
 
@@ -149,11 +218,43 @@ async function expandImageRefs(messages) {
   }));
 }
 
+function formatAttachmentContext(files = []) {
+  const validFiles = files.filter(file => file?.path);
+  if (!validFiles.length) return '';
+  return [
+    'Attached file(s) available in the chat workspace:',
+    ...validFiles.map(file => `- ${file.name || 'file'}: ${file.path}`),
+  ].join('\n');
+}
+
+function appendTextToContent(content, extraText) {
+  if (!extraText) return content;
+  if (typeof content === 'string') return [content, extraText].filter(Boolean).join('\n\n');
+
+  if (Array.isArray(content)) {
+    const parts = content.map(part => ({ ...part }));
+    const textPart = parts.find(part => part.type === 'text');
+    if (textPart) textPart.text = [textPart.text || '', extraText].filter(Boolean).join('\n\n');
+    else parts.unshift({ type: 'text', text: extraText });
+    return parts;
+  }
+
+  return extraText;
+}
+
+function prepareMessageForApi(message) {
+  const { attachments, ...cleanMessage } = message;
+  const fileContext = message.role === 'user' ? formatAttachmentContext(attachments || []) : '';
+  return fileContext
+    ? { ...cleanMessage, content: appendTextToContent(cleanMessage.content, fileContext) }
+    : cleanMessage;
+}
+
 async function buildApiMessages() {
   const messages = [];
   const systemParts = [state.systemPrompt, buildMcpPrompt({ tools: state.mcpTools, isServerEnabled })].filter(Boolean);
   if (systemParts.length) messages.push({ role: 'system', content: systemParts.join('\n\n') });
-  messages.push(...state.messages);
+  messages.push(...state.messages.map(prepareMessageForApi));
   return expandImageRefs(messages);
 }
 
@@ -222,7 +323,7 @@ export async function stopAssistantTurn() {
 // ── Main entry point ──────────────────────────────────────────────────────────
 
 export async function sendMessage(userText) {
-  if (!userText.trim() && !pendingImages.length) return;
+  if (!userText.trim() && !pendingImages.length && !pendingFiles.length) return;
   if (state.isStreaming) return;
   if (!state.convId) await createNewConversation();
 
@@ -230,9 +331,24 @@ export async function sendMessage(userText) {
 
   const textToSend   = userText.trim();
   const imagesToSend = pendingImages.splice(0);
+  const filesToSend  = pendingFiles.splice(0);
   refreshImagePreviewBar();
 
-  // Await any in-progress uploads before building the payload.
+  // Await any in-progress image uploads and copy regular files into the chat workspace.
+  let uploadedFiles = [];
+  try {
+    uploadedFiles = await uploadConversationFiles(state.convId, filesToSend);
+  } catch (err) {
+    pendingImages.unshift(...imagesToSend);
+    pendingFiles.unshift(...filesToSend);
+    refreshImagePreviewBar();
+    setStreaming(false);
+    const errorText = `File upload failed: ${err.message}`;
+    state.displayLog.push({ type: 'message', role: 'assistant', content: errorText });
+    appendMessage('assistant', errorText, state.displayLog.length - 1);
+    return;
+  }
+
   const uploadedRefs = await Promise.all(imagesToSend.map(img => img.uploadPromise));
   const validRefs    = uploadedRefs.filter(Boolean); // drop any that failed
 
@@ -240,19 +356,20 @@ export async function sendMessage(userText) {
   let displayContent;
 
   if (validRefs.length > 0) {
-    // API payload: text + image_ref blocks (refs get expanded to base64 in buildApiMessages)
+    // API payload: user-visible text + image_ref blocks. File paths are injected
+    // later by buildApiMessages() from message attachment metadata.
     apiContent = [];
     if (textToSend) apiContent.push({ type: 'text', text: textToSend });
     validRefs.forEach(r => apiContent.push({ type: 'image_ref', ref: r.ref }));
 
-    // Display payload: text + server URLs (no base64 in memory or JSON)
-    displayContent = { text: textToSend, imageUrls: validRefs.map(r => r.url) };
+    // Display payload: clean chat text + attachment chips.
+    displayContent = { text: textToSend, imageUrls: validRefs.map(r => r.url), files: uploadedFiles };
   } else {
     apiContent     = textToSend;
-    displayContent = textToSend;
+    displayContent = uploadedFiles.length ? { text: textToSend, files: uploadedFiles } : textToSend;
   }
 
-  state.messages.push({ role: 'user', content: apiContent });
+  state.messages.push({ role: 'user', content: apiContent, attachments: uploadedFiles });
   state.displayLog.push({ type: 'message', role: 'user', content: displayContent });
   appendMessage('user', displayContent, state.displayLog.length - 1);
 
