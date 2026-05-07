@@ -1,339 +1,324 @@
+# Lumen · AI Chat
 
-# Forge chat
+> A self-hosted, Flask-powered chat UI for any OpenAI-compatible AI model — with streaming, MCP tool integration, Docker sandboxes, and a polished frontend.
 
-A Flask-based chatbot application with support for MCP servers, real-time streaming responses, file handling, workspace management, and an interactive web UI.
+---
 
 ## 📋 Project Description
 
-**Forge chat** is a web-based chatbot application built with Flask. It provides a clean chat interface for interacting with AI models while supporting advanced capabilities through MCP servers.
+**Lumen** is a lightweight, self-hosted web application that gives you a beautiful, full-featured chat interface for any AI model that speaks the OpenAI API format — including GPT-4o, Claude (via compatible proxies), and local models running through Ollama or LM Studio.
 
-The application is designed to support real-time AI streaming, persistent conversations, file uploads, workspace file access, and tool execution through MCP integrations. It is suitable for local AI workflows, developer assistants, research tools, automation dashboards, and experimental AI applications.
-
-The goal of this project is to provide a modular, maintainable, and extensible chatbot foundation that can be customized for different AI providers, MCP tools, and user workflows.
+Conversations are persisted locally on your filesystem. Each conversation gets its own isolated file workspace and, optionally, a Docker-backed sandbox container so AI-generated code can run safely without touching your host system. MCP (Model Context Protocol) servers can be wired in at any time to give the model access to external tools.
 
 ---
 
 ## ✨ Features
 
-- Real-time streaming AI responses
-- Persistent chat conversations
-- Conversation title generation
-- MCP server integration
-- Native-style tool execution support
-- File upload support
-- Workspace file preview and download links
-- Markdown rendering for assistant responses
-- Reasoning and tool-call UI blocks
-- Conversation switching without losing active assistant turns
-- Backend-managed assistant turns independent of the active UI chat
-- Modular Flask backend architecture
-- Clean JavaScript frontend modules
-- Configurable AI model/provider settings
-- Local workspace isolation for generated files
-- Lightweight and customizable UI
+- **Any OpenAI-compatible model** — Point Lumen at OpenAI, Anthropic, a local Ollama instance, LM Studio, or any other compatible endpoint via a configurable base URL and API key.
+- **Real-time streaming** — Responses stream token-by-token over Server-Sent Events (SSE) with full support for cancellation mid-reply.
+- **MCP tool integration** — Configure one or more [Model Context Protocol](https://modelcontextprotocol.io) servers in `mcp.json`. Tools are auto-discovered and injected into the model's tool list.
+- **Per-conversation Docker sandboxes** — Each conversation can spin up an isolated `lumen-sandbox` Docker container with a shared `/workspace` volume, so the model can write and execute code safely.
+- **File workspaces** — Upload files to a conversation, browse the workspace directory tree, preview file contents, and download results — all from the sidebar.
+- **Voice input** — Dictate messages using the Web Speech API (Chrome and Edge).
+- **Rich rendering** — Markdown, fenced code blocks with syntax highlighting (highlight.js), and inline/block LaTeX math (KaTeX) all render beautifully.
+- **Thinking steps** — Extended reasoning / chain-of-thought blocks are displayed in a collapsible "thinking" panel.
+- **Auto-generated titles** — After the first exchange, a separate lightweight model call names the conversation in 2–5 words.
+- **Image uploads** — Paste or attach images; they are stored by content hash and sent as vision inputs.
+- **Customisable UI** — Accent colour, font size, sidebar default state, timestamps, and suggestion chips are all user-configurable and persisted in `localStorage`.
+- **Conversation search** — Filter the sidebar conversation list in real time.
 
 ---
 
 ## 🚀 Quick Start
 
-Clone the repository:
-
 ```bash
-git clone https://github.com/yossifibrahem/forge-chat
-cd forge-chat
-````
+# 1. Clone the repository
+git clone https://github.com/your-org/flask-chatbot-ui.git
+cd flask-chatbot-ui
 
-Create a virtual environment:
-
-```bash
-python -m venv .venv
-```
-
-Activate the virtual environment:
-
-```bash
-# macOS / Linux
-source .venv/bin/activate
-
-# Windows
-.venv\Scripts\activate
-```
-
-Install dependencies:
-
-```bash
+# 2. Install Python dependencies
 pip install -r requirements.txt
-```
 
-Run the application:
-
-```bash
+# 3. Run the development server
 python app.py
 ```
 
-Open the app in your browser:
-
-```text
-http://localhost:5000
-```
+Open **http://localhost:8080** in your browser, enter your API key and model name in the settings panel, and start chatting.
 
 ---
 
 ## 📦 Installation
 
-### Requirements
+### Prerequisites
 
-Make sure you have the following installed:
+| Requirement | Version | Notes |
+|---|---|---|
+| Python | 3.10+ | Earlier versions are untested |
+| pip | any | Comes with Python |
+| Docker | 20.10+ | Optional — only needed for sandbox containers |
+| Node.js | 22 (slim) | Only if you build the sandbox image yourself |
 
-* Python 3.10+
-* pip
-* Node.js, if using Node-based MCP servers
-* An AI provider or local model server compatible with the project configuration
-* Optional: Docker, if your workspace or MCP setup uses containers
+### Step-by-step
 
-### Install Python Dependencies
+**1. Clone and enter the project directory**
+
+```bash
+git clone https://github.com/your-org/flask-chatbot-ui.git
+cd flask-chatbot-ui
+```
+
+**2. (Recommended) Create a virtual environment**
+
+```bash
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+```
+
+**3. Install dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Install MCP Server Dependencies
+The `requirements.txt` pins:
 
-If your MCP servers are Node.js-based, install their dependencies separately:
-
-```bash
-cd path/to/mcp-server
-npm install
-npm run build
+```
+flask>=3.0.0
+flask-cors>=4.0.0
+openai>=1.30.0
+mcp>=1.0.0
 ```
 
-Repeat this for each MCP server used by the application.
+**4. (Optional) Build the sandbox Docker image**
+
+If you want the model to be able to execute code in an isolated container, build the sandbox image once:
+
+```bash
+docker build -f Dockerfile.sandbox -t lumen-sandbox .
+```
+
+Rebuild whenever `Dockerfile.sandbox` changes.
+
+**5. Start the server**
+
+```bash
+python app.py
+```
+
+The app starts on `http://0.0.0.0:8080` with `debug=True`. For production, run behind a WSGI server such as Gunicorn:
+
+```bash
+gunicorn -w 4 -b 0.0.0.0:8080 "app:create_app()"
+```
 
 ---
 
 ## ⚙️ Configuration
 
-Configuration may be handled through environment variables, local config files, or application settings depending on your setup.
+### API settings (in-app)
 
-Common configuration values include:
+All API settings are configured through the **Settings** panel in the UI — no `.env` file is required:
 
-```env
-FLASK_ENV=development
-SECRET_KEY=your-secret-key
+| Setting | Description |
+|---|---|
+| **API Key** | Your provider's API key (e.g. `sk-...` for OpenAI) |
+| **Base URL** | Defaults to `https://api.openai.com/v1`; change for Anthropic proxies, Ollama (`http://localhost:11434/v1`), etc. |
+| **Model** | Any model ID returned by the `/v1/models` endpoint |
+| **System prompt** | Optional system-level instruction prepended to every conversation |
 
-AI_API_BASE_URL=http://localhost:1234/v1
-AI_API_KEY=your-api-key
-DEFAULT_MODEL=your-model-name
+### Environment variables
 
-WORKSPACE_DIR=/path/to/workspace
-MCP_CONFIG_PATH=/path/to/mcp.json
-```
+Override defaults for Docker sandbox behaviour without editing source:
 
-### MCP Configuration
+| Variable | Default | Description |
+|---|---|---|
+| `LUMEN_SANDBOX_IMAGE` | `lumen-sandbox` | Docker image used for per-conversation containers |
+| `LUMEN_CONTAINERS_ROOT` | `~/.lumen/containers` | Host path for container workspace volumes |
+| `LUMEN_CONTAINER_MEMORY` | `512m` | Memory limit per sandbox container |
+| `LUMEN_CONTAINER_CPUS` | `1` | CPU quota per sandbox container |
+| `LUMEN_CONTAINER_NETWORK` | `bridge` | Docker network mode for sandbox containers |
+| `LUMEN_CONTAINER_PREFIX` | `lumen-chat-` | Prefix for auto-named containers |
 
-MCP servers can be configured using a JSON file such as `mcp.json`.
+### MCP tool servers (`mcp.json`)
 
-Example:
+Create `mcp.json` in the project root (or manage it through the **MCP** panel in the UI):
 
 ```json
 {
   "mcpServers": {
     "filesystem": {
-      "command": "node",
-      "args": [
-        "/path/to/filesystem-mcp-server/dist/index.js"
-      ],
-      "env": {
-        "WORKING_DIR": "/path/to/workspace"
-      }
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp/workspace"]
     },
-    "bash": {
-      "command": "node",
-      "args": [
-        "/path/to/bash-mcp-server/dist/index.js"
-      ],
+    "brave-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
       "env": {
-        "WORKING_DIR": "/path/to/workspace"
+        "BRAVE_API_KEY": "your-key-here"
       }
     }
   }
 }
 ```
 
-### Workspace Configuration
+Tools are discovered automatically on each conversation load and injected into the model's available tool list.
 
-The workspace is used for uploaded files, generated files, and files returned by tools.
+### Persistent data locations
 
-Recommended behavior:
+All data is stored under `~/.lumen/` by default:
 
-```text
-/workspace
 ```
-
-Inside the application, files can be referenced using markdown-style links:
-
-```markdown
-[Download the file](file:/workspace/example.pdf)
+~/.lumen/
+├── conversations/   # One JSON file per conversation
+├── containers/      # Docker workspace volumes (one dir per conversation)
+└── images/          # Uploaded images, keyed by SHA-256 hash
 ```
-
-The UI can render these links as downloadable file references.
 
 ---
 
 ## 💻 Usage Examples
 
-### Start a New Conversation
+### Basic chat
 
-Open the application and click **New Chat**. Enter a message and send it to the assistant.
+1. Open `http://localhost:8080`
+2. Click **New Chat** in the sidebar
+3. Click the ⚙️ settings icon, enter your API key and select a model
+4. Type a message and press **Enter** (or **Shift+Enter** for a new line)
 
-Example prompt:
+### Voice input
 
-```text
-Explain how Flask blueprints work and show a simple example.
-```
+Click the microphone button to start dictating. Lumen uses the browser's Web Speech API to transcribe in real time and appends the transcript to the message box. Press the mic button again to stop.
 
-### Upload a File
+### Uploading files to a conversation
 
-Use the attach button in the chat input to upload a file. The uploaded file becomes available to the assistant and can also be stored in the workspace.
+Open the **Files** panel (folder icon in the toolbar). Drag-and-drop files or click **Upload**. Files land in the conversation's isolated workspace directory and are accessible to MCP tools or sandbox code.
 
-Example:
+### Using MCP tools
 
-```text
-Please summarize the uploaded PDF and extract the main action items.
-```
+1. Open the **MCP** panel in the UI
+2. Add a server entry (name, command, args, env)
+3. Save — tools are listed immediately
+4. Ask the model to use a tool: the tool call, arguments, and result are all shown inline in the chat
 
-### Use MCP Tools
+### Cancelling a response
 
-When MCP servers are configured, the assistant can call available tools during a conversation.
+Click the **Stop** button (■) that appears in the toolbar while a response is streaming. The partial response is saved to the conversation history.
 
-Example prompt:
+### Switching models mid-conversation
 
-```text
-Create a Python script that analyzes this CSV file and saves a chart in the workspace.
-```
-
-The assistant may use filesystem or shell tools to inspect files, run commands, and generate outputs.
-
-### Download Generated Files
-
-When a tool or assistant creates a file, it can return a link like:
-
-```markdown
-[Download the report](file:/workspace/report.pdf)
-```
-
-Clicking the link downloads the file from the workspace.
+Open Settings at any time and change the model. The new model takes effect from the very next message; the full conversation history is replayed in the API call.
 
 ---
 
 ## 🧪 Running Tests
 
-If the project includes tests, run them with:
+Lumen does not currently ship a test suite. To add one, the recommended approach is:
 
 ```bash
-pytest
+pip install pytest pytest-flask
 ```
 
-For verbose output:
+Then create a `tests/` directory and use Flask's built-in test client:
+
+```python
+# tests/test_routes.py
+import pytest
+from app import create_app
+
+@pytest.fixture
+def client():
+    app = create_app()
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        yield client
+
+def test_index(client):
+    response = client.get("/")
+    assert response.status_code == 200
+
+def test_list_conversations(client):
+    response = client.get("/api/conversations")
+    assert response.status_code == 200
+    assert isinstance(response.get_json(), list)
+```
+
+Run with:
 
 ```bash
 pytest -v
 ```
 
-To run a specific test file:
-
-```bash
-pytest tests/test_chat.py
-```
-
-### Code Quality Checks
-
-Recommended checks:
-
-```bash
-python -m py_compile app.py
-```
-
-If the project uses JavaScript modules, you can validate syntax with:
-
-```bash
-node --check static/js/chat.js
-node --check static/js/renderer.js
-node --check static/js/conversations.js
-```
-
-For larger projects, consider adding:
-
-```bash
-ruff check .
-black .
-pytest
-```
+Contributions that add test coverage are especially welcome — see [Contributing](#-contributing) below.
 
 ---
 
 ## 📝 Contributing
 
-Contributions are welcome.
+Contributions are welcome! Here's how to get started:
 
-To contribute:
+**1. Fork and clone**
 
-1. Fork the repository.
-2. Create a new branch:
+```bash
+git clone https://github.com/your-org/flask-chatbot-ui.git
+cd flask-chatbot-ui
+```
+
+**2. Create a feature branch**
 
 ```bash
 git checkout -b feature/your-feature-name
 ```
 
-3. Make your changes.
-4. Run tests and checks.
-5. Commit your changes:
+**3. Make your changes**
 
-```bash
-git commit -m "Add your feature"
-```
+- Backend logic lives in the Python modules (`routes.py`, `chat_turn_service.py`, etc.)
+- Frontend JS is organised as ES modules under `static/js/`
+- Keep route handlers thin — heavy logic belongs in service modules
+- New MCP adapter patterns go in `mcp_adapters.py`
 
-6. Push your branch:
+**4. Test your changes**
 
-```bash
-git push origin feature/your-feature-name
-```
+Run the dev server and manually verify the feature works end-to-end. If you write automated tests (very appreciated!), run `pytest` before opening a PR.
 
-7. Open a pull request.
+**5. Open a pull request**
 
-### Contribution Guidelines
+Describe *what* the change does and *why*. Link any related issues. PRs should:
+- Be focused on a single concern
+- Not break existing functionality
+- Include a brief description of manual testing performed
 
-Please keep contributions focused and maintainable.
-
-Good contributions should:
-
-* Reduce unnecessary complexity
-* Preserve existing behavior unless intentionally changed
-* Keep backend and frontend responsibilities separated
-* Avoid large unrelated rewrites
-* Include tests where practical
-* Keep UI changes consistent with the existing design
+**Reporting bugs:** Open a GitHub Issue with steps to reproduce, the Python/browser version, and any relevant console output.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **[LICENSE NAME]** license.
+This project is released under the [MIT License](LICENSE).
 
-See the `LICENSE` file for more details.
+```
+MIT License
+
+Copyright (c) 2024 Lumen Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ---
 
-## Notes
-
-This project is intended to be easy to extend. The recommended architecture is:
-
-```text
-Backend routes handle HTTP only.
-Services contain business logic.
-Frontend modules handle UI state and rendering.
-MCP integrations stay isolated from core chat logic.
-Workspace logic stays separate from chat logic.
-```
-
-Keeping these boundaries clear makes the project easier to debug, refactor, and expand.
+*Built with Flask, love, and a healthy distrust of vendor lock-in.*
