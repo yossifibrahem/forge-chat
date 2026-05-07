@@ -106,9 +106,9 @@ chatbot/
 Lumen now treats the companion `bash-mcp-server` and `filesystem-mcp-server` as first-class chat tools:
 
 - Each conversation gets an isolated workspace at `~/.lumen/working_directory/<chat_id>`.
-- MCP invocations automatically receive that path as `WORKING_DIR`, so relative paths and shell commands stay scoped to the active chat.
+- MCP invocations automatically receive that path as `WORKING_DIR`, `PWD`, and process `cwd`, so local servers can use the active chat workspace.
 - The chat UI displays each tool call by its required `description` argument instead of the raw tool name, e.g. `Reading README.md` or `Installing packages with npm`.
-- Server-specific MCP behavior is isolated in `mcp_adapters.py`, `static/js/mcp_policy.js`, and `static/js/mcp_tool_ui.js`, so future server quirks can be added/removed without scattering changes across routes or render code.
+- App-level MCP behavior is isolated in `mcp_adapters.py`, `static/js/mcp_policy.js`, and `static/js/mcp_tool_ui.js`, so future server quirks can be added/removed without scattering changes across routes or render code. Filesystem sandboxing/path enforcement should live in the MCP server itself.
 
 ### Recommended local configuration
 

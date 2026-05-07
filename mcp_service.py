@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-from mcp_adapters import apply_workspace_process_options, expand_config_env, normalize_tool_arguments
+from mcp_adapters import apply_workspace_process_options, expand_config_env
 
 MCP_CONFIG_FILE = Path("mcp.json")
 
@@ -93,8 +93,7 @@ async def invoke_tool(server_name: str, server_config: dict, tool_name: str, arg
         async with stdio_client(params) as (reader, writer):
             async with ClientSession(reader, writer) as session:
                 await session.initialize()
-                normalized_arguments = normalize_tool_arguments(server_name, tool_name, arguments, working_dir)
-                result = await session.call_tool(tool_name, normalized_arguments)
+                result = await session.call_tool(tool_name, arguments)
                 text = "\n".join(
                     c.text if hasattr(c, "text") else str(c)
                     for c in result.content
