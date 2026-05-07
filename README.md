@@ -1,11 +1,11 @@
 
-# Lumen Forge
+# Forge chat
 
 A Flask-based chatbot application with support for MCP servers, real-time streaming responses, file handling, workspace management, and an interactive web UI.
 
 ## 📋 Project Description
 
-**Lumen Forge** is a web-based chatbot application built with Flask. It provides a clean chat interface for interacting with AI models while supporting advanced capabilities through MCP servers.
+**Forge chat** is a web-based chatbot application built with Flask. It provides a clean chat interface for interacting with AI models while supporting advanced capabilities through MCP servers.
 
 The application is designed to support real-time AI streaming, persistent conversations, file uploads, workspace file access, and tool execution through MCP integrations. It is suitable for local AI workflows, developer assistants, research tools, automation dashboards, and experimental AI applications.
 
