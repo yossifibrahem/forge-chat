@@ -39,8 +39,8 @@ The goal of this project is to provide a modular, maintainable, and extensible c
 Clone the repository:
 
 ```bash
-git clone <repository-url>
-cd <project-folder>
+git clone https://github.com/yossifibrahem/forge-chat
+cd forge-chat
 ````
 
 Create a virtual environment:
