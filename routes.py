@@ -594,7 +594,7 @@ def _parse_stream_payload(raw_event: str) -> dict | None:
         return None
 
 
-def _snapshot_active_turn(conv_id: str, title: str, messages: list, display_log: list, stream_id: str) -> None:
+def _save_turn(conv_id: str, title: str, messages: list, display_log: list, *, stream_id: str = "") -> None:
     if not conv_id:
         return
     data = store.load(conv_id) or {"id": conv_id, "created_at": ""}
@@ -602,35 +602,22 @@ def _snapshot_active_turn(conv_id: str, title: str, messages: list, display_log:
         "title": title or data.get("title") or "Untitled",
         "messages": messages,
         "displayLog": display_log,
-        "active_stream_id": stream_id,
-        "streaming": True,
+        "streaming": bool(stream_id),
         "working_directory": str(store.working_directory(conv_id)),
     })
+    if stream_id:
+        data["active_stream_id"] = stream_id
+    else:
+        data.pop("active_stream_id", None)
     store.save(conv_id, data)
 
 
-def _snapshot_finished_turn(conv_id: str, title: str, messages: list, display_log: list) -> None:
-    if not conv_id:
-        return
-    data = store.load(conv_id) or {"id": conv_id, "created_at": ""}
-    data.update({
-        "title": title or data.get("title") or "Untitled",
-        "messages": messages,
-        "displayLog": display_log,
-        "streaming": False,
-        "working_directory": str(store.working_directory(conv_id)),
-    })
-    data.pop("active_stream_id", None)
-    store.save(conv_id, data)
-
-
-def _display_log_with_partial(base_log: list, reasoning: str, text: str) -> list:
-    log = list(base_log)
-    if reasoning:
-        log.append({"type": "thinking", "content": reasoning})
-    if text:
-        log.append({"type": "message", "role": "assistant", "content": text})
-    return log
+def _log_with_partial(base_log: list, reasoning: str, text: str) -> list:
+    return [
+        *base_log,
+        *([{"type": "thinking", "content": reasoning}] if reasoning else []),
+        *([{"type": "message", "role": "assistant", "content": text}] if text else []),
+    ]
 
 
 def _tool_meta_by_name(body: dict) -> dict:
@@ -734,7 +721,7 @@ def _run_persistent_chat_turn(state: dict, body: dict, cancel_event: threading.E
         if not force and now - last_snapshot["at"] < 0.75 and size - last_snapshot["size"] < 512:
             return
         last_snapshot.update({"at": now, "size": size})
-        _snapshot_active_turn(conv_id, title, turn_messages, _display_log_with_partial(base_log, reasoning, text), stream_id)
+        _save_turn(conv_id, title, turn_messages, _log_with_partial(base_log, reasoning, text), stream_id=stream_id)
 
     base_log = list(display_log)
     save_active(base_log, force=True)
@@ -845,10 +832,10 @@ def _run_persistent_chat_turn(state: dict, body: dict, cancel_event: threading.E
                 _publish_stream_event(state, {"type": "title", "title": title})
                 save_active(base_log, force=True)
 
-        _snapshot_finished_turn(conv_id, title, turn_messages, base_log)
+        _save_turn(conv_id, title, turn_messages, base_log)
     except Exception as exc:
         _publish_stream_event(state, {"type": "error", "message": str(exc)})
-        _snapshot_finished_turn(conv_id, title, turn_messages, base_log)
+        _save_turn(conv_id, title, turn_messages, base_log)
     finally:
         _cancel_events.pop(stream_id, None)
         _finish_stream_state(state)

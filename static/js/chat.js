@@ -310,17 +310,6 @@ function isCurrentStreamContext(turn, ctx) {
   return activeTurns.get(turn.convId)?.ctx === ctx;
 }
 
-function releaseVisibleStreamingControls(turn, ctx) {
-  if (!turn || !isTurnVisible(turn) || !isCurrentStreamContext(turn, ctx)) return;
-  state.streamId = null;
-  setStreaming(false);
-}
-
-function nudgeScrollAfterAssistantDone(ctx) {
-  if (!ctx?.turn || !isTurnVisible(ctx.turn) || !isCurrentStreamContext(ctx.turn, ctx)) return;
-  scrollToBottom();
-}
-
 function createStreamContext(turn) {
   const ctx = {
     accText:            '',
@@ -329,7 +318,6 @@ function createStreamContext(turn) {
     reasoningBodyEl:    null,
     contentEl:          null,
     turn,
-    toolCalls:          null,
     toolStartNames:     [],
     toolStrips:         [],
     toolResultIndex:    0,
@@ -365,7 +353,7 @@ function reattachRuntime(runtime) {
   if (ctx.accReasoning) {
     ctx.reasoningBodyEl = createThinkingBlock();
     updateThinkingBlock(ctx.reasoningBodyEl, ctx.accReasoning);
-    if (ctx.reasoningFinalized || ctx.accText || ctx.toolCalls) {
+    if (ctx.reasoningFinalized || ctx.accText || ctx.toolStartNames.length) {
       finalizeThinkingBlock(ctx.reasoningBodyEl, ctx.accReasoning);
       ctx.reasoningBodyEl = null;
     }
@@ -434,10 +422,7 @@ async function attachServerStream(convId, streamId, data = {}) {
     if (!success || turnCancelled) return false;
 
     if (!ctx.assistantDone) finalizeAssistantAnswer(ctx);
-    if (isCurrentStreamContext(turn, ctx)) {
-      await refreshTurnFromServer(turn);
-      syncFinalAssistantFooter(turn, ctx);
-    }
+    if (isCurrentStreamContext(turn, ctx)) syncFinalAssistantFooter(turn, ctx);
     return true;
   } catch (err) {
     return false;
@@ -446,10 +431,19 @@ async function attachServerStream(convId, streamId, data = {}) {
   }
 }
 
-document.addEventListener('chat:conversation-opened', event => {
+document.addEventListener('chat:conversation-opened', async event => {
   const { convId, data } = event.detail || {};
-  if (data?.active_stream_id) attachServerStream(convId, data.active_stream_id, data);
-  else reattachActiveTurn(convId);
+  if (data?.active_stream_id) {
+    const attached = await attachServerStream(convId, data.active_stream_id, data);
+    if (!attached && state.convId === convId) {
+      state.messages = data.messages || [];
+      state.displayLog = data.displayLog || [];
+      renderAllMessages(state.displayLog);
+      setStreaming(false);
+    }
+    return;
+  }
+  reattachActiveTurn(convId);
 });
 
 function currentTitle() {
@@ -461,7 +455,10 @@ function applyTurnTitle(turn, title) {
   if (!turn || !nextTitle || turn.title === nextTitle) return;
 
   turn.title = nextTitle;
-  if (isTurnVisible(turn)) document.getElementById('chat-title-input').value = nextTitle;
+  if (isTurnVisible(turn)) {
+    const titleInput = document.getElementById('chat-title-input');
+    if (titleInput && document.activeElement !== titleInput) titleInput.value = nextTitle;
+  }
   document.dispatchEvent(new CustomEvent('chat:conversation-title-updated', {
     detail: { convId: turn.convId, title: nextTitle },
   }));
@@ -533,30 +530,12 @@ function finalizeAssistantAnswer(ctx, messages = null, displayLog = null) {
     syncFinalAssistantFooter(ctx.turn, ctx);
   }
 
-  // assistant_done owns the visible UI transition: the answer is finished, so
-  // restore the composer immediately and give sticky autoscroll one final nudge.
-  // Title generation and stream cleanup can still continue afterward.
-  releaseVisibleStreamingControls(ctx.turn, ctx);
-  nudgeScrollAfterAssistantDone(ctx);
-}
-
-async function refreshTurnFromServer(turn) {
-  if (!turn?.convId) return;
-  try {
-    const data = await api.get(`/api/conversations/${encodeURIComponent(turn.convId)}`);
-    applyTurnTitle(turn, data.title || turn.title);
-    turn.messages = data.messages || turn.messages;
-    turn.displayLog = data.displayLog || turn.displayLog;
-    syncVisibleTurn(turn);
-
-    // Do not call renderAllMessages() here. The visible DOM has already been
-    // updated incrementally by the stream; a full render at completion causes
-    // the assistant bubble to flash or disappear if the saved snapshot lags.
-    if (isTurnVisible(turn)) {
-      document.getElementById('chat-title-input').value = turn.title || '';
-      refreshFilePanel({ keepPreview: true }).catch(() => {});
-    }
-  } catch {}
+  // assistant_done owns only the visible UI transition. Stream cleanup/title work may continue.
+  if (isTurnVisible(ctx.turn) && isCurrentStreamContext(ctx.turn, ctx)) {
+    state.streamId = null;
+    setStreaming(false);
+    scrollToBottom();
+  }
 }
 
 async function runAssistantTurnAndPersist(turn) {
@@ -566,10 +545,7 @@ async function runAssistantTurnAndPersist(turn) {
 
   try {
     ctx = await runChatLoop(turn);
-    if (isCurrentStreamContext(turn, ctx)) {
-      await refreshTurnFromServer(turn);
-      syncFinalAssistantFooter(turn, ctx);
-    }
+    if (isCurrentStreamContext(turn, ctx)) syncFinalAssistantFooter(turn, ctx);
   } finally {
     finishAssistantTurn(turn, ctx);
   }
@@ -721,8 +697,7 @@ function processSSEEvent(raw, ctx) {
     ctx.toolStrips.push(ctx.isVisible() ? createToolStrip(evt.name) : null);
 
   } else if (evt.type === 'tool_calls') {
-    // Tool execution is server-owned so reloads cannot kill the turn.
-    ctx.toolCalls = evt.calls;
+    // Tool execution is server-owned; frontend only renders starts/results.
 
   } else if (evt.type === 'tool_result') {
     if (ctx.reasoningBodyEl) {
@@ -743,7 +718,6 @@ function processSSEEvent(raw, ctx) {
     ctx.accText = '';
     ctx.accReasoning = '';
     ctx.reasoningFinalized = false;
-    ctx.toolCalls = null;
     if (ctx.isVisible()) refreshFilePanel({ keepPreview: true }).catch(() => {});
 
   } else if (evt.type === 'assistant_done') {

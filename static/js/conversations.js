@@ -81,7 +81,7 @@ function updateConversationListTitle(convId, title) {
 
   const item = document.querySelector(`.conv-item[data-id="${CSS.escape(convId)}"]`);
   const titleEl = item?.querySelector('.conv-title');
-  if (!titleEl) return;
+  if (!titleEl || titleEl.textContent === title) return;
 
   titleEl.textContent = title;
 
@@ -96,12 +96,39 @@ function setActiveConversationItem(convId) {
   item?.classList.add('active');
 }
 
+function upsertConversationListItem(conv) {
+  const container = document.getElementById('conv-list');
+  if (!container || !conv?.id) return;
+
+  const existing = container.querySelector(`.conv-item[data-id="${CSS.escape(conv.id)}"]`);
+  if (existing) {
+    updateConversationListTitle(conv.id, conv.title || 'New Conversation');
+    setActiveConversationItem(conv.id);
+    return;
+  }
+
+  if (container.querySelector('.conv-empty')) container.innerHTML = '';
+  if (!container.querySelector('.conv-section-label')) {
+    container.appendChild(Object.assign(document.createElement('div'), {
+      className: 'conv-section-label',
+      textContent: 'Recent',
+    }));
+  }
+
+  container.insertBefore(_buildConvItem({
+    title: 'New Conversation',
+    message_count: 0,
+    ...conv,
+  }), container.querySelector('.conv-section-label')?.nextSibling || null);
+  setActiveConversationItem(conv.id);
+}
+
 document.addEventListener('chat:conversation-title-updated', event => {
   const { convId, title } = event.detail || {};
   updateConversationListTitle(convId, title);
 });
 
-function applyConversationData(id, data) {
+function applyConversationData(id, data, { render = true } = {}) {
   if (state.convId !== id) return;
 
   state.messages   = data.messages || [];
@@ -109,14 +136,15 @@ function applyConversationData(id, data) {
 
   updateTitleInput(data.title || '');
   updateConversationListTitle(id, data.title || '');
-  renderAllMessages(state.displayLog);
+  if (render) renderAllMessages(state.displayLog);
 }
 
 export async function openConversation(id) {
   const data = await api.get(`/api/conversations/${id}`);
   state.convId = id;
   storage.set(STORAGE_KEYS.lastConv, id);
-  applyConversationData(id, data);
+  const hasActiveStream = Boolean(data.active_stream_id);
+  applyConversationData(id, data, { render: !hasActiveStream });
   resetFilePanel();
   refreshFilePanel();
 
@@ -150,7 +178,7 @@ export async function createNewConversation() {
   document.getElementById('chat-title-input').value = 'New Conversation';
   resetFilePanel();
   refreshFilePanel();
-  await loadConversationList();
+  upsertConversationListItem(data);
 }
 
 export async function deleteConversation(convId) {
