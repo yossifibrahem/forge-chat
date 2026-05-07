@@ -1,6 +1,5 @@
 # lumen · AI Chat
-
-> A self-hosted, Flask-powered chat UI for any OpenAI-compatible AI model — with streaming, MCP tool integration, Docker sandboxes, and a polished frontend.
+A self-hosted, Flask-powered chat UI for any OpenAI-compatible AI model — with streaming, MCP tool integration, Docker sandboxes, and a polished frontend.
 
 ---
 
