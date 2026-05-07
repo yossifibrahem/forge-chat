@@ -1,252 +1,339 @@
-# Lumen — Flask AI Chatbot
 
-A sleek, feature-rich AI chatbot with streaming, Markdown/LaTeX rendering, MCP tool calling, and persistent conversations.
+# Lumen Forge
 
-## Quick Start
+A Flask-based chatbot application with support for MCP servers, real-time streaming responses, file handling, workspace management, and an interactive web UI.
+
+## 📋 Project Description
+
+**Lumen Forge** is a web-based chatbot application built with Flask. It provides a clean chat interface for interacting with AI models while supporting advanced capabilities through MCP servers.
+
+The application is designed to support real-time AI streaming, persistent conversations, file uploads, workspace file access, and tool execution through MCP integrations. It is suitable for local AI workflows, developer assistants, research tools, automation dashboards, and experimental AI applications.
+
+The goal of this project is to provide a modular, maintainable, and extensible chatbot foundation that can be customized for different AI providers, MCP tools, and user workflows.
+
+---
+
+## ✨ Features
+
+- Real-time streaming AI responses
+- Persistent chat conversations
+- Conversation title generation
+- MCP server integration
+- Native-style tool execution support
+- File upload support
+- Workspace file preview and download links
+- Markdown rendering for assistant responses
+- Reasoning and tool-call UI blocks
+- Conversation switching without losing active assistant turns
+- Backend-managed assistant turns independent of the active UI chat
+- Modular Flask backend architecture
+- Clean JavaScript frontend modules
+- Configurable AI model/provider settings
+- Local workspace isolation for generated files
+- Lightweight and customizable UI
+
+---
+
+## 🚀 Quick Start
+
+Clone the repository:
 
 ```bash
-# 1. Install dependencies
-pip install -r requirements.txt
+git clone <repository-url>
+cd <project-folder>
+````
 
-# 2. Run
-python app.py
-# → Open http://localhost:8080
+Create a virtual environment:
+
+```bash
+python -m venv .venv
 ```
 
-## Features
+Activate the virtual environment:
 
-| Feature | Details |
-|---|---|
-| **Streaming** | Real-time token-by-token response via SSE |
-| **Markdown + LaTeX** | Full GitHub Flavored Markdown + KaTeX math rendering |
-| **Code Highlighting** | Syntax highlighting via highlight.js with copy button |
-| **OpenAI-compatible** | Works with OpenAI, Ollama, LM Studio, Groq, Together, etc. |
-| **Model Fetch** | Auto-fetch available models from any API endpoint |
-| **Persistent Conversations** | Saved as JSON files in `./conversations/` |
-| **MCP Tool Calling** | Configure MCP servers in `mcp.json` |
-| **Workspace File Panel** | Browse each chat's `/workspace`, resize the panel, open files in a full-panel preview, copy text contents, and download any file |
-| **Tool Confirmation** | Every tool call shows name + arguments; requires user approval |
+```bash
+# macOS / Linux
+source .venv/bin/activate
 
-## Settings
+# Windows
+.venv\Scripts\activate
+```
 
-Go to **Settings** tab:
-- Set your **API Base URL** (e.g., `http://localhost:11434/v1` for Ollama)
-- Enter your **API Key**
-- Click **Fetch Models** to auto-discover available models
-- Click a model chip to select it
-- Optionally set a **System Prompt**
+Install dependencies:
 
-## MCP Tool Calling
+```bash
+pip install -r requirements.txt
+```
 
-Edit `mcp.json` or use the **MCP** tab in the UI:
+Run the application:
+
+```bash
+python app.py
+```
+
+Open the app in your browser:
+
+```text
+http://localhost:5000
+```
+
+---
+
+## 📦 Installation
+
+### Requirements
+
+Make sure you have the following installed:
+
+* Python 3.10+
+* pip
+* Node.js, if using Node-based MCP servers
+* An AI provider or local model server compatible with the project configuration
+* Optional: Docker, if your workspace or MCP setup uses containers
+
+### Install Python Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Install MCP Server Dependencies
+
+If your MCP servers are Node.js-based, install their dependencies separately:
+
+```bash
+cd path/to/mcp-server
+npm install
+npm run build
+```
+
+Repeat this for each MCP server used by the application.
+
+---
+
+## ⚙️ Configuration
+
+Configuration may be handled through environment variables, local config files, or application settings depending on your setup.
+
+Common configuration values include:
+
+```env
+FLASK_ENV=development
+SECRET_KEY=your-secret-key
+
+AI_API_BASE_URL=http://localhost:1234/v1
+AI_API_KEY=your-api-key
+DEFAULT_MODEL=your-model-name
+
+WORKSPACE_DIR=/path/to/workspace
+MCP_CONFIG_PATH=/path/to/mcp.json
+```
+
+### MCP Configuration
+
+MCP servers can be configured using a JSON file such as `mcp.json`.
+
+Example:
 
 ```json
 {
   "mcpServers": {
     "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
-      "env": {}
-    },
-    "brave-search": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "command": "node",
+      "args": [
+        "/path/to/filesystem-mcp-server/dist/index.js"
+      ],
       "env": {
-        "BRAVE_API_KEY": "your-key-here"
+        "WORKING_DIR": "/path/to/workspace"
+      }
+    },
+    "bash": {
+      "command": "node",
+      "args": [
+        "/path/to/bash-mcp-server/dist/index.js"
+      ],
+      "env": {
+        "WORKING_DIR": "/path/to/workspace"
       }
     }
   }
 }
 ```
 
-Click **Reload Tools** to connect and list available tools. When the model requests a tool, you'll see a confirmation card with the tool name and arguments before anything executes.
+### Workspace Configuration
 
-## File Structure
+The workspace is used for uploaded files, generated files, and files returned by tools.
 
-```
-chatbot/
-├── app.py                  # App factory + entry point
-├── routes.py               # Thin HTTP routes (one Blueprint)
-├── chat_turn_service.py    # Persistent chat turn orchestration + title generation
-├── workspace_service.py    # /workspace path safety, file listing, preview, uploads
-├── store.py                # Conversation persistence (file-system CRUD)
-├── mcp_service.py          # MCP config, tool discovery, tool invocation
-├── streaming.py            # SSE formatting + OpenAI stream loop
-├── mcp.json                # MCP server configuration (auto-created)
-├── requirements.txt
-├── conversations/          # Saved conversations (auto-created)
-├── templates/
-│   └── index.html          # App shell (no inline CSS or JS)
-└── static/
-    ├── css/
-    │   └── main.css        # All styles
-    └── js/
-        ├── app.js          # Entry point — event binding + boot
-        ├── state.js        # Shared state object + constants
-        ├── storage.js      # localStorage wrapper
-        ├── api.js          # Typed HTTP client
-        ├── markdown.js     # Markdown + LaTeX rendering pipeline
-        ├── renderer.js     # DOM rendering (messages, tool dialogs)
-        ├── format.js       # Shared client-side formatting helpers
-        ├── conversations.js# Conversation list, open, create, delete
-        ├── settings.js     # Settings load/save, model list
-        ├── mcp.js          # MCP config, tool list, tool execution
-        ├── chat.js         # SSE stream loop + tool-call orchestration
-        └── ui.js           # Toast, modals, sidebar, input helpers
+Recommended behavior:
+
+```text
+/workspace
 ```
 
-## Compatible APIs
+Inside the application, files can be referenced using markdown-style links:
 
-- **OpenAI** → `https://api.openai.com/v1`
-- **Ollama** → `http://localhost:11434/v1`
-- **LM Studio** → `http://localhost:1234/v1`
-- **Groq** → `https://api.groq.com/openai/v1`
-- **Together AI** → `https://api.together.xyz/v1`
-- **Anthropic (via proxy)** → any OpenAI-compatible proxy
+```markdown
+[Download the file](file:/workspace/example.pdf)
+```
 
+The UI can render these links as downloadable file references.
 
-## Optimized Bash + Filesystem MCP Setup
+---
 
-Lumen now treats the companion `bash-mcp-server` and `filesystem-mcp-server` as first-class chat tools:
+## 💻 Usage Examples
 
-- Each conversation gets a persistent workspace at `~/.lumen/containers/<chat_id>`.
-- Host-runtime MCP servers receive that host path as `WORKING_DIR`, `PWD`, and process `cwd`; container-runtime MCP servers receive `/workspace`, mounted from the same host folder.
-- The chat UI displays each tool call by its required `description` argument instead of the raw tool name, e.g. `Reading README.md` or `Installing packages with npm`.
-- App-level MCP behavior is isolated in `mcp_adapters.py`, `static/js/mcp_policy.js`, and `static/js/mcp_tool_ui.js`, so future server quirks can be added/removed without scattering changes across routes or render code.
+### Start a New Conversation
 
-### Recommended local configuration
+Open the application and click **New Chat**. Enter a message and send it to the assistant.
 
-Build both servers first:
+Example prompt:
+
+```text
+Explain how Flask blueprints work and show a simple example.
+```
+
+### Upload a File
+
+Use the attach button in the chat input to upload a file. The uploaded file becomes available to the assistant and can also be stored in the workspace.
+
+Example:
+
+```text
+Please summarize the uploaded PDF and extract the main action items.
+```
+
+### Use MCP Tools
+
+When MCP servers are configured, the assistant can call available tools during a conversation.
+
+Example prompt:
+
+```text
+Create a Python script that analyzes this CSV file and saves a chart in the workspace.
+```
+
+The assistant may use filesystem or shell tools to inspect files, run commands, and generate outputs.
+
+### Download Generated Files
+
+When a tool or assistant creates a file, it can return a link like:
+
+```markdown
+[Download the report](file:/workspace/report.pdf)
+```
+
+Clicking the link downloads the file from the workspace.
+
+---
+
+## 🧪 Running Tests
+
+If the project includes tests, run them with:
 
 ```bash
-cd bash-mcp-server-main && npm install && npm run build
-cd ../filesystem-mcp-server-main && npm install && npm run build
+pytest
 ```
 
-Then open **Settings → MCP Servers**, add the built server paths manually in `mcp.json`, click **Save Config**, then **Reload Tools**:
+For verbose output:
 
-```json
-{
-  "mcpServers": {
-    "BASH_MCP_SERVER": {
-      "command": "node",
-      "args": ["/absolute/path/to/bash-mcp-server-main/dist/index.js"],
-      "env": {}
-    },
-    "FILESYSTEM_MCP_SERVER": {
-      "command": "node",
-      "args": ["/absolute/path/to/filesystem-mcp-server-main/dist/index.js"],
-      "env": {}
-    }
-  }
-}
+```bash
+pytest -v
+```
+
+To run a specific test file:
+
+```bash
+pytest tests/test_chat.py
+```
+
+### Code Quality Checks
+
+Recommended checks:
+
+```bash
+python -m py_compile app.py
+```
+
+If the project uses JavaScript modules, you can validate syntax with:
+
+```bash
+node --check static/js/chat.js
+node --check static/js/renderer.js
+node --check static/js/conversations.js
+```
+
+For larger projects, consider adding:
+
+```bash
+ruff check .
+black .
+pytest
 ```
 
 ---
 
-## Per-Chat Container Isolation
+## 📝 Contributing
 
-MCP servers run on the host by default. Local tools that should be isolated must explicitly opt into a per-chat Docker container with `"runtime": "container"`. For backward compatibility, `"sandbox": true` also works. Server names such as `bash` or `filesystem` are **not** containerized automatically.
+Contributions are welcome.
 
-Each containerized conversation uses its own Docker container (`lumen-chat-<conv_id>`), so bash commands, Python package installs, and filesystem writes are isolated from the host OS and from other chats.
+To contribute:
 
-### How it works
-
-| Layer | What changes |
-|---|---|
-| **Default MCP runtime** | Host, unless `"runtime": "container"` is set |
-| **Host workspace** | `~/.lumen/containers/<conv_id>/` |
-| **In-container path** | `/workspace` |
-| **MCP invocation** | `docker exec -i --workdir /workspace --env WORKING_DIR=/workspace lumen-chat-<conv_id> ...` |
-| **Container lifetime** | Created on first containerized tool call, removed when conversation is deleted |
-
-### Quick start
+1. Fork the repository.
+2. Create a new branch:
 
 ```bash
-# 1. Build the sandbox image once per machine, or whenever Dockerfile.sandbox changes
-docker build -f Dockerfile.sandbox -t lumen-sandbox .
-
-# 2. Run the app as normal
-python app.py
+git checkout -b feature/your-feature-name
 ```
 
-Containers are started automatically on the first containerized MCP tool call. Deleting a conversation removes both its Docker container and its host workspace folder. Orphaned `lumen-chat-*` containers from previous runs are removed at startup.
-
-### Runtime config
-
-Host runtime, useful for remote MCP servers such as Exa:
-
-```json
-{
-  "mcpServers": {
-    "exa": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcp.exa.ai/mcp"]
-    }
-  }
-}
-```
-
-Container runtime, useful for local bash/filesystem/code execution tools:
-
-```json
-{
-  "mcpServers": {
-    "filesystem": {
-      "command": "node",
-      "args": ["/path/to/filesystem-mcp-server/dist/index.js"],
-      "runtime": "container"
-    }
-  }
-}
-```
-
-Legacy config still works:
-
-```json
-{
-  "sandbox": true
-}
-```
-
-Important safety behavior: if a server is configured for container runtime and Docker cannot start the container, the server does **not** fall back to host execution. The tool fails closed instead.
-
-### Container API
-
-```
-GET /api/conversations/<conv_id>/container
-→ { "status": "running"|"stopped"|"missing", "container_name": "lumen-chat-…", "workspace": "…" }
-
-GET /api/conversations/<conv_id>/files?path=/workspace
-→ List files/folders in the chat workspace
-
-GET /api/conversations/<conv_id>/files/content?path=/workspace/app.py
-→ Preview text/code/Markdown in the workspace panel; binary files are download-only
-
-GET /api/conversations/<conv_id>/files/download?path=/workspace/app.py
-→ Download any file from the chat workspace
-→ Preview text/code/Markdown files when safe
-
-GET /api/conversations/<conv_id>/files/download?path=/workspace/output.zip
-→ Download any file from the chat workspace
-```
-
-### Resource limits (defaults)
-
-| Limit | Value |
-|---|---|
-| Memory | 512 MB |
-| CPUs | 1 |
-| Network | bridge |
-| Capabilities | minimal (CHOWN, DAC_OVERRIDE, SETUID, SETGID) |
-
-Override these with environment variables instead of editing code:
+3. Make your changes.
+4. Run tests and checks.
+5. Commit your changes:
 
 ```bash
-export LUMEN_SANDBOX_IMAGE=lumen-sandbox
-export LUMEN_CONTAINERS_ROOT=~/.lumen/containers
-export LUMEN_CONTAINER_MEMORY=512m
-export LUMEN_CONTAINER_CPUS=1
-export LUMEN_CONTAINER_NETWORK=bridge
-export LUMEN_CONTAINER_PREFIX=lumen-chat-
+git commit -m "Add your feature"
 ```
+
+6. Push your branch:
+
+```bash
+git push origin feature/your-feature-name
+```
+
+7. Open a pull request.
+
+### Contribution Guidelines
+
+Please keep contributions focused and maintainable.
+
+Good contributions should:
+
+* Reduce unnecessary complexity
+* Preserve existing behavior unless intentionally changed
+* Keep backend and frontend responsibilities separated
+* Avoid large unrelated rewrites
+* Include tests where practical
+* Keep UI changes consistent with the existing design
+
+---
+
+## 📄 License
+
+This project is licensed under the **[LICENSE NAME]** license.
+
+See the `LICENSE` file for more details.
+
+---
+
+## Notes
+
+This project is intended to be easy to extend. The recommended architecture is:
+
+```text
+Backend routes handle HTTP only.
+Services contain business logic.
+Frontend modules handle UI state and rendering.
+MCP integrations stay isolated from core chat logic.
+Workspace logic stays separate from chat logic.
+```
+
+Keeping these boundaries clear makes the project easier to debug, refactor, and expand.
