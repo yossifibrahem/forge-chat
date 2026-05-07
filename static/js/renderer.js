@@ -13,6 +13,18 @@ function getToolIconSvg(toolName) {
   return ICONS[iconKey] || ICONS.plug;
 }
 
+export function getToolDisplayLabel(toolName, args = {}) {
+  const description = String(args?.description || '').trim();
+  return description || toolName;
+}
+
+function getToolMetaText(toolName, args = {}) {
+  const pieces = [];
+  if (toolName === 'bash_tool' && args.command) pieces.push(args.command);
+  if ((toolName === 'view' || toolName === 'create_file' || toolName === 'str_replace') && args.path) pieces.push(args.path);
+  return pieces.join(' · ');
+}
+
 const SUGGESTION_CHIPS = [
   { icon: ICONS.chipCode,       label: 'Code',       prompt: 'Help me write some code' },
   { icon: ICONS.chipPencil,      label: 'Write',      prompt: 'Help me write something' },
@@ -564,6 +576,13 @@ function formatToolValue(value) {
   return normalizeBlockText(value);
 }
 
+function visibleToolArgs(args = {}) {
+  if (!args || typeof args !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(args).filter(([key]) => key !== 'description')
+  );
+}
+
 function formatArgsHtml(args) {
   return Object.entries(args).map(([key, value]) => `
     <div class="arg-item">
@@ -572,32 +591,74 @@ function formatArgsHtml(args) {
     </div>`).join('');
 }
 
-function createToolResultBody(args, result) {
-  const hasArgs = args && Object.keys(args).length > 0;
-  const resultHtml = `<div class="tr-section"><div class="tr-section-label">Result</div><pre class="tr-result">${escapeHtml(formatToolValue(result))}</pre></div>`;
+function parseToolObject(value) {
+  if (value && typeof value === 'object') return value;
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!text || !/^[\[{]/.test(text)) return null;
+  try { return JSON.parse(text); } catch { return null; }
+}
 
-  if (!hasArgs) return resultHtml;
+function renderJsonResult(data) {
+  if (Array.isArray(data)) {
+    return `<div class="tr-command-result"><pre class="tr-result">${escapeHtml(formatToolValue(data))}</pre></div>`;
+  }
 
-  return `
+  const entries = Object.entries(data || {});
+  if (!entries.length) {
+    return `<pre class="tr-result">${escapeHtml(formatToolValue(data))}</pre>`;
+  }
+
+  const blocks = entries.map(([key, value]) => `
+    <div>
+      <div class="tr-section-label">${escapeHtml(key)}</div>
+      <pre class="tr-result">${escapeHtml(formatToolValue(value))}</pre>
+    </div>`).join('');
+
+  return `<div class="tr-command-result">${blocks}</div>`;
+}
+
+function renderResultSection(result) {
+  const data = parseToolObject(result);
+  return data
+    ? renderJsonResult(data)
+    : `<pre class="tr-result">${escapeHtml(formatToolValue(result))}</pre>`;
+}
+
+function createToolResultBody(toolName, args, result) {
+  const displayArgs = visibleToolArgs(args);
+  const sections = [];
+
+  if (Object.keys(displayArgs).length) {
+    sections.push(`
+      <div class="tr-section">
+        <div class="tr-section-label">Arguments</div>
+        <div class="tr-args">${formatArgsHtml(displayArgs)}</div>
+      </div>`);
+  }
+
+  sections.push(`
     <div class="tr-section">
-      <div class="tr-section-label">Arguments</div>
-      <div class="tr-args">${formatArgsHtml(args)}</div>
-    </div>
-    ${resultHtml}`;
+      <div class="tr-section-label">Result</div>
+      ${renderResultSection(result)}
+    </div>`);
+
+  return sections.join('');
 }
 
 // appendToolResult is used by renderAllMessages for history replay
-function appendToolResultInline(toolName, args, result) {
+function appendToolResultInline(toolName, args, result, displayName = '') {
   const expanded = state.blocksDefaultExpanded;
+  const label = displayName || getToolDisplayLabel(toolName, args);
   const row = prepareAssistantRow();
   const strip = createElement('div', { className: `tool-strip tool-strip-result tool-inline${expanded ? ' open' : ''}` });
   strip.innerHTML = `
     <button class="tr-summary">
       <span class="tr-chevron">${expanded ? ICONS.chevronDown : ICONS.chevronRight}</span>
       <span class="tool-icon">${getToolIconSvg(toolName)}</span>
-      <span class="tr-tool-name">${escapeHtml(toolName)}</span>
+      <span class="tr-tool-name">${escapeHtml(label)}</span>
     </button>
-    <div class="tr-body" style="${expanded ? '' : 'display:none'}">${createToolResultBody(args, result)}</div>`;
+    <div class="tr-body" style="${expanded ? '' : 'display:none'}">${createToolResultBody(toolName, args, result)}</div>`;
   attachCollapsible(strip, {
     headerSelector:  '.tr-summary',
     bodySelector:    '.tr-body',
@@ -626,7 +687,7 @@ export function renderAllMessages(displayLog) {
       if (entry.role === 'assistant' && !String(entry.content ?? '').trim()) return;
       appendMessage(entry.role, entry.content, idx);
     }
-    if (entry.type === 'tool_result') appendToolResultInline(entry.name, entry.args, entry.result);
+    if (entry.type === 'tool_result') appendToolResultInline(entry.name, entry.args, entry.result, entry.displayName);
     if (entry.type === 'thinking') appendThinkingBlock(entry.content);
   });
   scrollToBottom(true);
@@ -636,13 +697,14 @@ export function renderAllMessages(displayLog) {
 // Each tool call gets ONE element that morphs through: using → approval → running → result.
 
 /** Creates the strip in "using" state and appends it to the current assistant row. */
-export function createToolStrip(toolName) {
+export function createToolStrip(toolName, displayName = '') {
   const row = prepareAssistantRow();
   const strip = createElement('div', { className: 'tool-strip tool-strip-using' });
   strip.dataset.toolName = toolName;
+  strip.dataset.displayName = displayName || toolName;
   strip.innerHTML = `
     <span class="tool-icon">${getToolIconSvg(toolName)}</span>
-    <span>using <span class="tui-name">${escapeHtml(toolName)}</span></span>
+    <span>using <span class="tui-name">${escapeHtml(displayName || toolName)}</span></span>
     <span class="thinking-pulse"></span>`;
   row.appendChild(strip);
   scrollToBottom();
@@ -655,6 +717,10 @@ export function toolStripSetApproval(strip, call) {
     let args = {};
     try { args = JSON.parse(call.function.arguments || '{}'); } catch {}
     const hasArgs = Object.keys(args).length > 0;
+    const displayName = getToolDisplayLabel(call.function.name, args);
+    const metaText = getToolMetaText(call.function.name, args);
+    strip.dataset.toolName = call.function.name;
+    strip.dataset.displayName = displayName;
 
     strip.className = 'tool-strip tool-strip-approval tc-item open';
     strip.innerHTML = `
@@ -662,8 +728,8 @@ export function toolStripSetApproval(strip, call) {
         <button class="tc-item-header">
           <span class="tc-item-chevron">${ICONS.chevronDown}</span>
           <span class="tool-icon">${getToolIconSvg(call.function.name)}</span>
-          <span class="tc-item-name">${escapeHtml(call.function.name)}</span>
-          ${hasArgs ? '' : '<span class="tc-item-noargs">no arguments</span>'}
+          <span class="tc-item-name">${escapeHtml(displayName)}</span>
+          ${metaText ? `<span class="tc-item-noargs">${escapeHtml(metaText)}</span>` : (hasArgs ? '' : '<span class="tc-item-noargs">no arguments</span>')}
         </button>
         <span class="tc-actions">
           <button class="tc-allow">${ICONS.check} allow</button>
@@ -711,6 +777,8 @@ export function toolStripSetApproval(strip, call) {
 /** Morphs strip from approval → running state. */
 export function toolStripSetRunning(strip, args = {}) {
   const name = strip.dataset.toolName || '';
+  const displayName = getToolDisplayLabel(name, args);
+  strip.dataset.displayName = displayName;
   const hasArgs = Object.keys(args).length > 0;
   strip.className = 'tool-strip tool-strip-running';
   strip.innerHTML = `
@@ -719,10 +787,10 @@ export function toolStripSetRunning(strip, args = {}) {
         ? `<button class="tc-item-header">
              <span class="tc-item-chevron">${ICONS.chevronRight}</span>
              <span class="tool-icon">${getToolIconSvg(name)}</span>
-             <span>running <span class="tui-name">${escapeHtml(name)}</span></span>
+             <span>running <span class="tui-name">${escapeHtml(displayName)}</span></span>
            </button>`
         : `<span class="tool-icon">${getToolIconSvg(name)}</span>
-           <span>running <span class="tui-name">${escapeHtml(name)}</span></span>`}
+           <span>running <span class="tui-name">${escapeHtml(displayName)}</span></span>`}
       <span class="thinking-pulse"></span>
     </div>
     ${hasArgs ? `<div class="tc-item-args" style="display:none">${formatArgsHtml(args)}</div>` : ''}`;
@@ -738,16 +806,17 @@ export function toolStripSetRunning(strip, args = {}) {
 }
 
 /** Morphs strip into the final collapsible result state. */
-export function toolStripFinalize(strip, toolName, args, result) {
+export function toolStripFinalize(strip, toolName, args, result, displayName = '') {
   const expanded = state.blocksDefaultExpanded;
+  const label = displayName || getToolDisplayLabel(toolName, args);
   strip.className = `tool-strip tool-strip-result tool-inline${expanded ? ' open' : ''}`;
   strip.innerHTML = `
     <button class="tr-summary">
       <span class="tr-chevron">${expanded ? ICONS.chevronDown : ICONS.chevronRight}</span>
       <span class="tool-icon">${getToolIconSvg(toolName)}</span>
-      <span class="tr-tool-name">${escapeHtml(toolName)}</span>
+      <span class="tr-tool-name">${escapeHtml(label)}</span>
     </button>
-    <div class="tr-body" style="${expanded ? '' : 'display:none'}">${createToolResultBody(args, result)}</div>`;
+    <div class="tr-body" style="${expanded ? '' : 'display:none'}">${createToolResultBody(toolName, args, result)}</div>`;
 
   attachCollapsible(strip, {
     headerSelector:  '.tr-summary',

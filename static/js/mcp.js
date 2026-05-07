@@ -58,6 +58,7 @@ export async function saveMcpConfig() {
   }
 }
 
+
 // ── Tool loading ──────────────────────────────────────────────────────────────
 
 export function loadCachedTools() {
@@ -217,7 +218,7 @@ export async function executeTool(tc, options = {}) {
 
   try {
     const data = await api.post('/api/mcp/call', {
-      server: toolDef.server, tool: tc.function.name, arguments: args,
+      server: toolDef.server, tool: tc.function.name, arguments: args, conv_id: state.convId,
     }, { signal: options.signal });
     return data.result ?? data.error ?? '';
   } catch (err) {

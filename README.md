@@ -99,3 +99,40 @@ chatbot/
 - **Groq** → `https://api.groq.com/openai/v1`
 - **Together AI** → `https://api.together.xyz/v1`
 - **Anthropic (via proxy)** → any OpenAI-compatible proxy
+
+
+## Optimized Bash + Filesystem MCP Setup
+
+Lumen now treats the companion `bash-mcp-server` and `filesystem-mcp-server` as first-class chat tools:
+
+- Each conversation gets an isolated workspace at `~/.lumen/working_directory/<chat_id>`.
+- MCP invocations automatically receive that path as `WORKING_DIR`, so relative paths and shell commands stay scoped to the active chat.
+- The chat UI displays each tool call by its required `description` argument instead of the raw tool name, e.g. `Reading README.md` or `Installing packages with npm`.
+
+### Recommended local configuration
+
+Build both servers first:
+
+```bash
+cd bash-mcp-server-main && npm install && npm run build
+cd ../filesystem-mcp-server-main && npm install && npm run build
+```
+
+Then open **Settings → MCP Servers**, add the built server paths manually in `mcp.json`, click **Save Config**, then **Reload Tools**:
+
+```json
+{
+  "mcpServers": {
+    "BASH_MCP_SERVER": {
+      "command": "node",
+      "args": ["/absolute/path/to/bash-mcp-server-main/dist/index.js"],
+      "env": {}
+    },
+    "FILESYSTEM_MCP_SERVER": {
+      "command": "node",
+      "args": ["/absolute/path/to/filesystem-mcp-server-main/dist/index.js"],
+      "env": {}
+    }
+  }
+}
+```

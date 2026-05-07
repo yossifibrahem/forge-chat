@@ -8,7 +8,7 @@ import {
   cancelAllToolApprovals, finalizeStreamingMessage, setStreamingMessageLogIndex,
   escapeHtml, scrollToBottom, renderAllMessages,
   createThinkingBlock, updateThinkingBlock, finalizeThinkingBlock,
-  createToolStrip, toolStripSetApproval, toolStripSetRunning, toolStripFinalize,
+  createToolStrip, toolStripSetApproval, toolStripSetRunning, toolStripFinalize, getToolDisplayLabel,
 } from './renderer.js';
 import { applyMarkdown } from './markdown.js';
 import { executeTool, isServerEnabled, isServerAutoApprove } from './mcp.js';
@@ -148,9 +148,24 @@ async function expandImageRefs(messages) {
   }));
 }
 
+function buildMcpSystemPrompt() {
+  const enabledTools = state.mcpTools.filter(tool => isServerEnabled(tool.server));
+  if (!enabledTools.length) return '';
+
+  const toolNames = enabledTools.map(tool => `${tool.server}.${tool.name}`).join(', ');
+  return [
+    'MCP tools are available in this chat: ' + toolNames + '.',
+    'The backend scopes filesystem and bash MCP servers to this conversation\'s own working directory: ~/.lumen/working_directory/<chat_id>. Treat relative paths and leading-slash paths like /temp as workspace-rooted paths, not host-root paths.',
+    'For every MCP tool call, always provide a concise, human-readable `description` argument first. This description is shown in the chat UI as the live action label, for example: "Reading README.md", "Creating src/app.py", or "Installing packages with npm".',
+    'For filesystem edits, view the target file immediately before str_replace, then re-view after successful edits before making further edits to the same file.',
+    'Use bash_tool for commands and the filesystem tools for precise file reads/writes/edits. Keep commands scoped to the chat working directory unless the user clearly requests otherwise.',
+  ].join('\n');
+}
+
 async function buildApiMessages() {
   const messages = [];
-  if (state.systemPrompt) messages.push({ role: 'system', content: state.systemPrompt });
+  const systemParts = [state.systemPrompt, buildMcpSystemPrompt()].filter(Boolean);
+  if (systemParts.length) messages.push({ role: 'system', content: systemParts.join('\n\n') });
   messages.push(...state.messages);
   return expandImageRefs(messages);
 }
@@ -361,6 +376,7 @@ async function runChatLoop() {
       messages:  await buildApiMessages(),
       tools:     buildToolsPayload(),
       stream_id: state.streamId,
+      conv_id:   state.convId,
     }, { signal: turnAbortController.signal });
 
     if (!resp.ok) throw new Error(await readResponseError(resp));
@@ -519,8 +535,9 @@ async function handleToolCalls(calls, precedingText, precedingReasoning = '', to
       result = 'Tool execution denied by user.';
     }
 
-    toolStripFinalize(strips[i], tc.function.name, args, result);
-    state.displayLog.push({ type: 'tool_result', name: tc.function.name, args, result });
+    const displayName = getToolDisplayLabel(tc.function.name, args);
+    toolStripFinalize(strips[i], tc.function.name, args, result, displayName);
+    state.displayLog.push({ type: 'tool_result', name: tc.function.name, displayName, args, result });
     state.messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
   }
 

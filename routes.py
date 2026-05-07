@@ -59,7 +59,15 @@ def create_conversation():
 @blueprint.route("/api/conversations/<conv_id>", methods=["GET"])
 def get_conversation(conv_id: str):
     data = store.load(conv_id)
-    return jsonify(data) if data else (jsonify({"error": "Not found"}), 404)
+    if data:
+        data.setdefault("working_directory", str(store.working_directory(conv_id)))
+        return jsonify(data)
+    return jsonify({"error": "Not found"}), 404
+
+
+@blueprint.route("/api/conversations/<conv_id>/workspace", methods=["GET"])
+def get_conversation_workspace(conv_id: str):
+    return jsonify({"working_directory": str(store.working_directory(conv_id))})
 
 
 @blueprint.route("/api/conversations/<conv_id>", methods=["PUT"])
@@ -104,8 +112,16 @@ def call_mcp_tool():
     server_config = mcp_service.find_server(server_name)
     if not server_config:
         return jsonify({"error": f"MCP server '{server_name}' not found"}), 404
+    conv_id = body.get("conv_id", "")
+    working_dir = str(store.working_directory(conv_id)) if conv_id else None
     result = mcp_service.run_async(
-        mcp_service.invoke_tool(server_name, server_config, body.get("tool", ""), body.get("arguments", {}))
+        mcp_service.invoke_tool(
+            server_name,
+            server_config,
+            body.get("tool", ""),
+            body.get("arguments", {}),
+            working_dir=working_dir,
+        )
     )
     return jsonify({"result": result})
 

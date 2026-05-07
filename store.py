@@ -20,6 +20,9 @@ CONVERSATIONS_DIR.mkdir(parents=True, exist_ok=True)
 IMAGES_DIR = Path.home() / ".lumen" / "images"
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
+WORKING_DIRECTORIES_DIR = Path.home() / ".lumen" / "working_directory"
+WORKING_DIRECTORIES_DIR.mkdir(parents=True, exist_ok=True)
+
 _SAFE_NAME = re.compile(r'^[a-f0-9]{64}\.(png|jpeg|webp|gif)$')
 
 
@@ -52,6 +55,18 @@ def _path(conv_id: str) -> Path:
     return CONVERSATIONS_DIR / f"{conv_id}.json"
 
 
+def working_directory(conv_id: str) -> Path:
+    """Return the isolated MCP working directory for one conversation.
+
+    Every chat gets its own stable folder under ~/.lumen/working_directory/<chat_id>.
+    The folder is created lazily and is safe to pass to MCP servers as WORKING_DIR.
+    """
+    safe_id = re.sub(r"[^a-zA-Z0-9_-]", "_", conv_id or "default")
+    path = WORKING_DIRECTORIES_DIR / safe_id
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def list_all() -> list[dict]:
@@ -65,6 +80,7 @@ def list_all() -> list[dict]:
                 "title":         data.get("title", "Untitled"),
                 "updated_at":    data.get("updated_at", ""),
                 "message_count": len(data.get("messages", [])),
+                "working_directory": str(working_directory(path.stem)),
             })
         except Exception:
             pass
@@ -95,8 +111,9 @@ def create(title: str = "New Conversation") -> dict:
     """Create, persist, and return a blank conversation."""
     conv_id = str(uuid.uuid4())
     return save(conv_id, {
-        "id":         conv_id,
-        "title":      title,
-        "messages":   [],
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "id":                conv_id,
+        "title":             title,
+        "messages":          [],
+        "working_directory": str(working_directory(conv_id)),
+        "created_at":        datetime.now(timezone.utc).isoformat(),
     })
