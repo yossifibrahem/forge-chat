@@ -306,6 +306,7 @@ function createStreamContext(turn) {
     turn,
     toolStartNames:     [],
     toolStrips:         [],
+    toolRunningIndex:   0,
     toolResultIndex:    0,
     assistantDone:      false,
     isVisible:          () => isTurnVisible(turn),
@@ -704,6 +705,13 @@ async function processSSEEvent(raw, ctx) {
       call_id:   evt.call_id,
       approved,
     }).catch(() => {});
+
+  } else if (evt.type === 'tool_running') {
+    const stripIndex = ctx.toolRunningIndex || 0;
+    let strip = ctx.toolStrips[stripIndex];
+    if (!strip && ctx.isVisible()) strip = createToolStrip(evt.name);
+    if (strip) toolStripSetRunning(strip, evt.args || {});
+    ctx.toolRunningIndex = stripIndex + 1;
 
   } else if (evt.type === 'tool_result') {
     if (ctx.reasoningBodyEl) {

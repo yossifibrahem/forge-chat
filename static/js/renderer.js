@@ -271,16 +271,24 @@ function makeGroupSummary(elements) {
   return parts.join(' + ');
 }
 
+function getBlockLabel(el) {
+  if (!el) return '';
+
+  if (el.classList.contains('thinking-block')) {
+    return el.querySelector('.thinking-label')?.textContent?.trim() || 'Thinking';
+  }
+
+  if (!el.classList.contains('tool-strip')) return '';
+
+  const name = el.dataset.displayName || el.dataset.toolName || 'tool';
+  if (el.classList.contains('tool-strip-using')) return name;
+  if (el.classList.contains('tool-strip-running')) return name;
+  if (el.classList.contains('tool-strip-approval')) return name;
+  return el.querySelector('.tr-tool-name')?.textContent?.trim() || name;
+}
+
 function getLastBlockLabel(elements) {
-  const last = elements[elements.length - 1];
-  if (!last) return '';
-  if (last.classList.contains('thinking-block'))
-    return last.querySelector('.thinking-label')?.textContent?.trim() || 'Thinking';
-  if (last.classList.contains('tool-strip'))
-    return last.querySelector('.tr-tool-name')?.textContent?.trim()
-        || last.dataset.displayName
-        || 'Tool';
-  return '';
+  return getBlockLabel(elements[elements.length - 1]);
 }
 
 function createGroupBlock(elements) {
@@ -319,6 +327,30 @@ function updateGroupLabel(group) {
   const dsc = group?.querySelector('.group-desc');
   if (lbl) lbl.textContent = getLastBlockLabel(elements);
   if (dsc) dsc.textContent = makeGroupSummary(elements);
+}
+
+function popApprovalOutOfGroup(strip) {
+  const group = strip.closest('.block-group');
+  const body = group?.querySelector('.group-body');
+  if (!group || !body) return;
+
+  const placeholder = createElement('span', { className: 'group-popout-placeholder' });
+  placeholder.hidden = true;
+  body.insertBefore(placeholder, strip);
+  group.after(strip);
+
+  strip._groupPlaceholder = placeholder;
+  updateGroupLabel(group);
+}
+
+function restorePoppedApproval(strip) {
+  const placeholder = strip._groupPlaceholder;
+  if (!placeholder?.parentNode) return;
+
+  const group = placeholder.closest('.block-group');
+  placeholder.parentNode.replaceChild(strip, placeholder);
+  delete strip._groupPlaceholder;
+  updateGroupLabel(group);
 }
 
 function previousBlockSibling(el) {
@@ -685,7 +717,7 @@ export function createToolStrip(toolName, displayName = '') {
   strip.dataset.displayName = displayName || toolName;
   strip.innerHTML = `
     <span class="tool-icon">${getToolIconSvg(toolName)}</span>
-    <span>using <span class="tui-name">${escapeHtml(displayName || toolName)}</span></span>
+    <span class="tui-name">${escapeHtml(displayName || toolName)}</span>
     <span class="thinking-pulse"></span>`;
   row.appendChild(strip);
   if (state.groupSequentialBlocks) tryGroupBlock(strip);
@@ -730,7 +762,7 @@ export function toolStripSetApproval(strip, call) {
       });
     }
 
-    updateGroupLabel(strip.closest('.block-group'));
+    popApprovalOutOfGroup(strip);
 
     let settled = false;
     const decide = allowed => {
@@ -763,6 +795,7 @@ export function toolStripSetApproval(strip, call) {
 
 /** Morphs strip from approval → running state. */
 export function toolStripSetRunning(strip, args = {}) {
+  restorePoppedApproval(strip);
   const name = strip.dataset.toolName || '';
   const displayName = getToolDisplayLabel(name, args);
   strip.dataset.displayName = displayName;
@@ -774,10 +807,10 @@ export function toolStripSetRunning(strip, args = {}) {
         ? `<button class="tc-item-header">
              <span class="tc-item-chevron">${ICONS.chevronRight}</span>
              <span class="tool-icon">${getToolIconSvg(name)}</span>
-             <span>running <span class="tui-name">${escapeHtml(displayName)}</span></span>
+             <span class="tui-name">${escapeHtml(displayName)}</span>
            </button>`
         : `<span class="tool-icon">${getToolIconSvg(name)}</span>
-           <span>running <span class="tui-name">${escapeHtml(displayName)}</span></span>`}
+           <span class="tui-name">${escapeHtml(displayName)}</span>`}
       <span class="thinking-pulse"></span>
     </div>
     ${hasArgs ? `<div class="tc-item-args" style="display:none">${formatArgsHtml(args)}</div>` : ''}`;
@@ -793,6 +826,7 @@ export function toolStripSetRunning(strip, args = {}) {
   scrollToBottom();
 }
 export function toolStripFinalize(strip, toolName, args, result, displayName = '') {
+  restorePoppedApproval(strip);
   const expanded = state.blocksDefaultExpanded;
   // Always derive the label through the adapter system (tool_adapters/index.js).
   // Each adapter declares a `labelArg` so the right argument is picked automatically.

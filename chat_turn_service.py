@@ -360,6 +360,10 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
                             continue
                     # ──────────────────────────────────────────────────────────
 
+                    # Let the client show the actual running state even when the
+                    # server auto-approves the call and no approval UI is shown.
+                    publish({"type": "tool_running", "name": name, "args": args_preview})
+
                     args, result = _run_mcp_call(conv_id, meta, call)
                     # displayName is intentionally omitted here — the JS adapter system
                     # (tool_adapters/) is the single source of truth for display labels.
