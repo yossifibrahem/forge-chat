@@ -260,7 +260,12 @@ async function buildApiMessages(turnMessages) {
   const messages = [];
   const systemParts = [state.systemPrompt, buildMcpPrompt({ tools: state.mcpTools, isServerEnabled })].filter(Boolean);
   if (systemParts.length) messages.push({ role: 'system', content: systemParts.join('\n\n') });
-  messages.push(...turnMessages.map(prepareMessageForApi));
+
+  // Apply the context-window limit: 0 means send the full history.
+  const contextWindow = state.contextMessages || 0;
+  const sliced = contextWindow > 0 ? turnMessages.slice(-contextWindow) : turnMessages;
+
+  messages.push(...sliced.map(prepareMessageForApi));
   return expandImageRefs(messages);
 }
 
@@ -812,6 +817,8 @@ async function runChatLoop(turn) {
       mcp_tool_meta:         buildMcpToolMetaPayload(),
       stream_id:             streamId,
       conv_id:               turn.convId,
+      auto_generate_titles:  state.autoGenerateTitles ?? true,
+      request_timeout:       state.requestTimeout || 120,
     }, { signal: turnAbortController.signal });
 
     if (!resp.ok) throw new Error(await readResponseError(resp));

@@ -299,6 +299,7 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
                 cancel_event=cancel_event,
                 temperature=float(body.get("temperature", 0.7)),
                 max_tokens=int(body.get("max_tokens", 0)) or None,
+                timeout=float(body.get("request_timeout", 120)) or None,
             ):
                 event = _parse_stream_payload(raw)
                 if not event:
@@ -385,7 +386,8 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
             publish({"type": "assistant_done", "messages": turn_messages, "displayLog": display_log})
             break
 
-        if assistant_completed and is_first_message and not cancel_event.is_set():
+        if assistant_completed and is_first_message and not cancel_event.is_set() \
+                and body.get("auto_generate_titles", True):
             generated_title = _generate_title(body, turn_messages)
             if generated_title:
                 recorder.update_title(generated_title)

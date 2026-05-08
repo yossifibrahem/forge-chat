@@ -35,11 +35,6 @@ export function isServerAutoApprove(serverName) {
   return getServerSetting(serverName).autoApprove === true;
 }
 
-/** Returns the icon key (e.g. 'plug', 'mcpWebSearch') saved for a server. */
-export function getServerIconKey(serverName) {
-  return getServerSetting(serverName).icon || 'plug';
-}
-
 // ── Config ────────────────────────────────────────────────────────────────────
 
 export async function loadMcpConfig() {
@@ -229,23 +224,4 @@ function renderToolList() {
   document.addEventListener('click', () => {
     container.querySelectorAll('.icon-picker-dropdown').forEach(d => { d.style.display = 'none'; });
   }, { once: true });
-}
-
-// ── Tool execution ────────────────────────────────────────────────────────────
-
-export async function executeTool(tc, options = {}) {
-  const toolDef = state.mcpTools.find(t => t.name === tc.function.name);
-  if (!toolDef) return 'Tool not found in any MCP server.';
-
-  let args = {};
-  try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
-
-  try {
-    const data = await api.post('/api/mcp/call', {
-      server: toolDef.server, tool: tc.function.name, arguments: args, conv_id: options.convId ?? state.convId,
-    }, { signal: options.signal });
-    return data.result ?? data.error ?? '';
-  } catch (err) {
-    return `Error: ${err.message}`;
-  }
 }

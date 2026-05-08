@@ -39,6 +39,7 @@ def stream_chat_completion(
     cancel_event: threading.Event,
     temperature: float = 0.7,
     max_tokens: int | None = None,
+    timeout: float | None = None,
 ) -> Generator[str, None, None]:
     """Yield SSE strings for a streaming OpenAI chat completion.
 
@@ -54,6 +55,8 @@ def stream_chat_completion(
         }
         if max_tokens:
             request_kwargs["max_tokens"] = max_tokens
+        if timeout:
+            request_kwargs["timeout"] = timeout
         if tools:
             request_kwargs["tools"] = tools
             request_kwargs["tool_choice"] = "auto"

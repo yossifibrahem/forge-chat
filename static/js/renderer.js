@@ -423,7 +423,7 @@ export function finalizeThinkingBlock(bodyEl, fullText) {
   // Eagerly group this block with any adjacent finished blocks.
   if (state.groupSequentialBlocks) tryGroupAfterFinalize(block);}
 
-export function appendThinkingBlock(reasoningText) {
+function appendThinkingBlock(reasoningText) {
   if (!reasoningText) return;
 
   const expanded = state.blocksDefaultExpanded;
