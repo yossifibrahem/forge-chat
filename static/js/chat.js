@@ -753,7 +753,7 @@ async function processSSEEvent(raw, ctx) {
     // Pass no displayName — renderer.js derives the label via getToolDisplayLabel()
     // which consults the tool_adapters/ system (each adapter declares its own labelArg).
     if (strip) toolStripFinalize(strip, evt.name, evt.args || {}, evt.result || '');
-    ctx.toolResultIndex = stripIndex + 1;
+    // Note: stripForToolEvent already increments ctx.toolResultIndex internally.
 
     ctx.accText = '';
     ctx.accReasoning = '';
