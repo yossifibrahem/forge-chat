@@ -96,17 +96,17 @@ svg { flex-shrink: 0; }
 #file-preview-body::-webkit-scrollbar-thumb,
 .file-code-preview::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 999px; }
 
-:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .conv-del, #attach-btn, #mic-btn, #send-btn, #stop-btn, .file-panel-actions button, .file-preview-actions button, .msg-action-btn, .tc-allow, .tc-deny, .btn-primary, .btn-secondary, .modal-tab, .sidebar-action, #btn-new-chat, #model-badge, .mp-chip, .model-chip, .model-row, .model-refresh-btn, .server-icon-btn, .icon-option, .eye-btn, .file-row, .suggestion-chip, .code-copy, .img-preview-remove) {
+:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .conv-menu-btn, #attach-btn, #mic-btn, #send-btn, #stop-btn, .file-panel-actions button, .file-preview-actions button, .msg-action-btn, .tc-allow, .tc-deny, .btn-primary, .btn-secondary, .modal-tab, .sidebar-action, #btn-new-chat, #model-badge, .mp-chip, .model-chip, .model-row, .model-refresh-btn, .server-icon-btn, .icon-option, .eye-btn, .file-row, .suggestion-chip, .code-copy, .img-preview-remove) {
   transition: color var(--fast), background var(--fast), border-color var(--fast), opacity var(--fast), transform var(--fast), box-shadow var(--fast);
 }
 
-:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .conv-del, #attach-btn, #mic-btn, #send-btn, #stop-btn, .file-panel-actions button, .file-preview-actions button, .model-refresh-btn) {
+:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .conv-menu-btn, #attach-btn, #mic-btn, #send-btn, #stop-btn, .file-panel-actions button, .file-preview-actions button, .model-refresh-btn) {
   display: grid;
   place-items: center;
   border: none;
 }
 
-:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .conv-del, #attach-btn, #mic-btn, .file-panel-actions button, .file-preview-actions button, .msg-action-btn, .tc-allow, .tc-deny, .modal-tab, .model-refresh-btn, .eye-btn) {
+:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .conv-menu-btn, #attach-btn, #mic-btn, .file-panel-actions button, .file-preview-actions button, .msg-action-btn, .tc-allow, .tc-deny, .modal-tab, .model-refresh-btn, .eye-btn) {
   background: none;
 }
 

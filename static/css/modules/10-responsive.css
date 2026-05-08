@@ -27,7 +27,7 @@
   #empty-state { padding-bottom: 280px; }
   .input-hint { display: none; }
   .conv-item { padding: 10px 8px; }
-  .conv-del { opacity: 1; padding: 6px; }
+  .conv-menu-btn { opacity: 1; padding: 6px; }
   .sidebar-action { padding: 11px 10px; }
   #btn-toggle-sidebar, #btn-toggle-files { width: 36px; height: 36px; }
   #btn-toggle-sidebar svg { width: 20px; height: 20px; }

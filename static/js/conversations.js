@@ -57,14 +57,69 @@ function _buildConvItem(conv) {
     <div class="conv-info">
       <div class="conv-title">${escapeHtml(title)}</div>
     </div>
-    <button class="conv-del" type="button" title="Delete conversation" aria-label="Delete conversation">
-      ${ICONS.close}
-    </button>`;
+    <div class="conv-menu-wrap">
+      <button class="conv-menu-btn" type="button" title="Conversation options" aria-label="Conversation options" aria-expanded="false">
+        ${ICONS.moreVertical}
+      </button>
+      <div class="conv-menu" role="menu">
+        <button class="conv-menu-item" type="button" role="menuitem" data-action="rename">
+          ${ICONS.edit}
+          <span>Rename</span>
+        </button>
+        <button class="conv-menu-item danger" type="button" role="menuitem" data-action="remove">
+          ${ICONS.trash}
+          <span>Remove</span>
+        </button>
+      </div>
+    </div>`;
 
-  item.addEventListener('click', e => { if (!e.target.closest('.conv-del')) openConversation(conv.id); });
-  item.querySelector('.conv-del').addEventListener('click', e => { e.stopPropagation(); deleteConversation(conv.id); });
+  item.addEventListener('click', e => {
+    if (!e.target.closest('.conv-menu-wrap')) openConversation(conv.id);
+  });
+
+  const menuBtn = item.querySelector('.conv-menu-btn');
+  menuBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleConversationMenu(item);
+  });
+
+  item.querySelector('[data-action="rename"]').addEventListener('click', e => {
+    e.stopPropagation();
+    closeConversationMenus();
+    renameConversation(conv.id);
+  });
+
+  item.querySelector('[data-action="remove"]').addEventListener('click', e => {
+    e.stopPropagation();
+    closeConversationMenus();
+    deleteConversation(conv.id);
+  });
+
   return item;
 }
+
+function closeConversationMenus(exceptItem = null) {
+  document.querySelectorAll('.conv-item.menu-open').forEach(item => {
+    if (item === exceptItem) return;
+    item.classList.remove('menu-open');
+    item.querySelector('.conv-menu-btn')?.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function toggleConversationMenu(item) {
+  const willOpen = !item.classList.contains('menu-open');
+  closeConversationMenus(item);
+  item.classList.toggle('menu-open', willOpen);
+  item.querySelector('.conv-menu-btn')?.setAttribute('aria-expanded', String(willOpen));
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.conv-menu-wrap')) closeConversationMenus();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeConversationMenus();
+});
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
@@ -177,6 +232,19 @@ export async function createNewConversation() {
   resetFilePanel();
   refreshFilePanel();
   upsertConversationListItem(data);
+}
+
+export async function renameConversation(convId) {
+  if (!convId) return;
+
+  const currentTitle = document.querySelector(`.conv-item[data-id="${CSS.escape(convId)}"] .conv-title`)?.textContent || 'Untitled';
+  const title = prompt('Rename conversation', currentTitle);
+  if (title === null) return;
+
+  const nextTitle = title.trim() || 'Untitled';
+  await persistConversationFor(convId, { title: nextTitle });
+
+  if (state.convId === convId) updateTitleInput(nextTitle);
 }
 
 export async function deleteConversation(convId) {

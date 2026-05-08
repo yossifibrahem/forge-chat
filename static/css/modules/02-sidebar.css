@@ -127,7 +127,6 @@
 .conv-icon svg { width: 12px; height: 12px; }
 .conv-item:hover .conv-icon { color: var(--text2); }
 .conv-item.active .conv-icon {
-  /* background: var(--surface2); */
   color: var(--accent);
 }
 .conv-info {
@@ -143,7 +142,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.conv-del {
+.conv-menu-wrap { position: relative; }
+.conv-menu-btn {
   width: 25px;
   height: 25px;
   padding: 0;
@@ -151,13 +151,48 @@
   color: var(--text3);
   opacity: 0;
 }
-.conv-item:hover .conv-del,
-.conv-del:focus-visible { opacity: 1; }
-.conv-del:hover {
+.conv-item:hover .conv-menu-btn,
+.conv-item.menu-open .conv-menu-btn,
+.conv-menu-btn:focus-visible { opacity: 1; }
+.conv-menu-btn:hover,
+.conv-item.menu-open .conv-menu-btn {
   background: var(--surface2);
-  color: var(--red);
+  color: var(--text2);
 }
-.conv-del svg { width: 11px; height: 11px; }
+.conv-menu-btn svg { width: 13px; height: 13px; }
+.conv-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 120px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .16);
+  display: none;
+}
+.conv-item.menu-open .conv-menu { display: block; }
+.conv-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text2);
+  background: transparent;
+  font-size: .72rem;
+  text-align: left;
+}
+.conv-menu-item:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+.conv-menu-item.danger:hover { color: var(--red); }
+.conv-menu-item svg { width: 12px; height: 12px; }
 
 /* ─── Sidebar footer ──────────────────────────────────────────────────────── */
 #sidebar-footer {
