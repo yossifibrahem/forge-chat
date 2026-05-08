@@ -259,29 +259,33 @@ function isGroupableBlock(el) {
   );
 }
 
-// Single pass over groupable elements — returns both the header label (last block)
-// and the summary string (counts), avoiding two iterations for the same data.
-function getGroupMeta(elements) {
-  let thinks = 0, tools = 0, label = '';
-  for (const el of elements) {
-    if (el.classList.contains('thinking-block')) {
-      thinks++;
-      label = el.querySelector('.thinking-label')?.textContent?.trim() || 'Thinking';
-    } else if (el.classList.contains('tool-strip')) {
-      tools++;
-      label = el.querySelector('.tr-tool-name')?.textContent?.trim()
-            || el.dataset.displayName
-            || 'Tool';
-    }
-  }
+function makeGroupSummary(elements) {
+  let thinks = 0, tools = 0;
+  elements.forEach(el => {
+    if (el.classList.contains('thinking-block')) thinks++;
+    else if (el.classList.contains('tool-strip')) tools++;
+  });
   const parts = [];
   if (thinks) parts.push(`${thinks} thinking`);
-  if (tools)  parts.push(`${tools} tool use`);
-  return { label, summary: parts.join(' + ') };
+  if (tools) parts.push(`${tools} tool use`);
+  return parts.join(' + ');
+}
+
+function getLastBlockLabel(elements) {
+  const last = elements[elements.length - 1];
+  if (!last) return '';
+  if (last.classList.contains('thinking-block'))
+    return last.querySelector('.thinking-label')?.textContent?.trim() || 'Thinking';
+  if (last.classList.contains('tool-strip'))
+    return last.querySelector('.tr-tool-name')?.textContent?.trim()
+        || last.dataset.displayName
+        || 'Tool';
+  return '';
 }
 
 function createGroupBlock(elements) {
-  const { label, summary } = getGroupMeta(elements);
+  const summary = makeGroupSummary(elements);
+  const label   = getLastBlockLabel(elements);
   const expanded = state.blocksDefaultExpanded;
 
   const group = createElement('div', { className: `block-group${expanded ? ' open' : ''}` });
@@ -309,14 +313,20 @@ function createGroupBlock(elements) {
 }
 
 function updateGroupLabel(group) {
-  const body = group?.querySelector('.group-body');
-  if (!body) return;
-  const elements = [...body.children].filter(isGroupableBlock);
-  const { label, summary } = getGroupMeta(elements);
-  const lbl = group.querySelector('.group-label');
-  const dsc = group.querySelector('.group-desc');
-  if (lbl) lbl.textContent = label;
-  if (dsc) dsc.textContent = summary;
+  const body     = group?.querySelector('.group-body');
+  const elements = body ? [...body.children].filter(isGroupableBlock) : [];
+  const lbl = group?.querySelector('.group-label');
+  const dsc = group?.querySelector('.group-desc');
+  if (lbl) lbl.textContent = getLastBlockLabel(elements);
+  if (dsc) dsc.textContent = makeGroupSummary(elements);
+}
+
+function previousBlockSibling(el) {
+  let prev = el.previousElementSibling;
+  while (prev?.classList.contains('msg-content') && !prev.textContent.trim()) {
+    prev = prev.previousElementSibling;
+  }
+  return prev;
 }
 
 function tryGroupBlock(el) {
@@ -330,7 +340,7 @@ function tryGroupBlock(el) {
     return;
   }
 
-  const prev = el.previousElementSibling;
+  const prev = previousBlockSibling(el);
   if (!prev) return;
 
   if (prev.classList.contains('block-group')) {
@@ -632,7 +642,12 @@ function appendToolResultInline(toolName, args, result, displayName = '') {
     chevronSelector: '.tr-chevron',
   });
   row.appendChild(strip);
-  if (state.groupSequentialBlocks) tryGroupBlock(strip);
+  // Eagerly group with adjacent blocks (history replay path).
+  if (strip.closest('.block-group')) {
+    updateGroupLabel(strip.closest('.block-group'));
+  } else if (state.groupSequentialBlocks) {
+    tryGroupBlock(strip);
+  }
   scrollToBottom();
 }
 
@@ -799,7 +814,11 @@ export function toolStripFinalize(strip, toolName, args, result, displayName = '
     chevronSelector: '.tr-chevron',
   });
 
-  if (state.groupSequentialBlocks) tryGroupBlock(strip);
+  if (strip.closest('.block-group')) {
+    updateGroupLabel(strip.closest('.block-group'));
+  } else if (state.groupSequentialBlocks) {
+    tryGroupBlock(strip);
+  }
   scrollToBottom();
 }
 
