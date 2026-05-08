@@ -407,8 +407,7 @@ export function finalizeThinkingBlock(bodyEl, fullText) {
   }
 
   // Eagerly group this block with any adjacent finished blocks.
-  tryGroupAfterFinalize(block);
-}
+  if (state.groupSequentialBlocks) tryGroupAfterFinalize(block);}
 
 export function appendThinkingBlock(reasoningText) {
   if (!reasoningText) return;
@@ -433,7 +432,7 @@ export function appendThinkingBlock(reasoningText) {
 
   row.appendChild(block);
   // Eagerly group with adjacent finished blocks (history replay path).
-  tryGroupAfterFinalize(block);
+  if (state.groupSequentialBlocks) tryGroupAfterFinalize(block);
   scrollToBottom();
 }
 
@@ -625,7 +624,7 @@ function appendToolResultInline(toolName, args, result, displayName = '') {
   });
   row.appendChild(strip);
   // Eagerly group with adjacent finished blocks (history replay path).
-  tryGroupAfterFinalize(strip);
+  if (state.groupSequentialBlocks) tryGroupAfterFinalize(strip);
   scrollToBottom();
 }
 
@@ -788,7 +787,7 @@ export function toolStripFinalize(strip, toolName, args, result, displayName = '
   });
 
   // Eagerly group this strip with any adjacent finished blocks.
-  tryGroupAfterFinalize(strip);
+  if (state.groupSequentialBlocks) tryGroupAfterFinalize(strip);
   scrollToBottom();
 }
 

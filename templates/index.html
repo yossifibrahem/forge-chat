@@ -72,9 +72,6 @@
       r.style.setProperty('--font-roman', fontMap[prefs.fontFamily]);
     }
 
-    // Compact mode
-    if (prefs.compactMode) r.classList.add('compact-mode');
-
     // Char count
     if (prefs.showCharCount === false) r.classList.add('hide-char-count');
 
@@ -504,14 +501,15 @@
 
           <div class="cust-row">
             <div class="cust-row-label">
-              <span class="cust-label">Compact message layout</span>
-              <span class="cust-hint">Tighter spacing between messages</span>
+              <span class="cust-label">Group sequential blocks</span>
+              <span class="cust-hint">Collapse consecutive thinking and tool-use blocks into a single group</span>
             </div>
             <label class="cust-toggle">
-              <input type="checkbox" id="cust-compact-mode" />
+              <input type="checkbox" id="cust-group-seq-blocks" />
               <span class="cust-toggle-track"><span class="cust-toggle-thumb"></span></span>
             </label>
           </div>
+
 
           <div class="cust-row">
             <div class="cust-row-label">

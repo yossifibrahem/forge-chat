@@ -1720,10 +1720,6 @@ html.hide-suggestion-chips #suggestions-bar { display: none !important; }
 [data-theme="light"] .range-slider { background: #dddbd4; }
 [data-theme="light"] .range-slider::-webkit-slider-thumb { border-color: #fff; }
 
-/* Compact mode */
-.compact-mode .msg { padding: 10px 16px; }
-.compact-mode .msg + .msg { margin-top: 2px; }
-
 /* Hide char count */
 .hide-char-count .char-count { display: none !important; }
 

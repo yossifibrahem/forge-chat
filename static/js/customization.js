@@ -33,8 +33,6 @@ export function applyCustomization() {
   // Suggestion chips visibility
   document.documentElement.classList.toggle('hide-suggestion-chips', !state.showSuggestionChips);
 
-  // Compact mode
-  document.documentElement.classList.toggle('compact-mode', !!state.compactMode);
 
   // Char count
   document.documentElement.classList.toggle('hide-char-count', !state.showCharCount);
@@ -95,7 +93,7 @@ export function saveCustomization() {
     showSuggestionChips:   state.showSuggestionChips,
     showTimestamps:        state.showTimestamps,
     blocksDefaultExpanded: state.blocksDefaultExpanded,
-    compactMode:           state.compactMode,
+    groupSequentialBlocks: state.groupSequentialBlocks,
     showCharCount:         state.showCharCount,
     fontSize:              state.fontSize,
     fontFamily:            state.fontFamily,
@@ -170,9 +168,9 @@ export function syncCustomizationUI() {
   _setCheckbox('cust-sidebar-open',    state.sidebarDefaultOpen);
   _setCheckbox('cust-suggestion-chips',state.showSuggestionChips);
   _setCheckbox('cust-timestamps',      state.showTimestamps);
-  _setCheckbox('cust-blocks-expanded', state.blocksDefaultExpanded);
-  _setCheckbox('cust-compact-mode',    state.compactMode);
-  _setCheckbox('cust-char-count',      state.showCharCount);
+  _setCheckbox('cust-blocks-expanded',   state.blocksDefaultExpanded);
+  _setCheckbox('cust-group-seq-blocks',  state.groupSequentialBlocks);
+  _setCheckbox('cust-char-count',        state.showCharCount);
 
   const fs = document.getElementById('cust-font-size');
   if (fs) fs.value = state.fontSize;
@@ -205,7 +203,7 @@ function _readControlsIntoState() {
   state.showSuggestionChips   = document.getElementById('cust-suggestion-chips')?.checked  ?? state.showSuggestionChips;
   state.showTimestamps        = document.getElementById('cust-timestamps')?.checked         ?? state.showTimestamps;
   state.blocksDefaultExpanded = document.getElementById('cust-blocks-expanded')?.checked   ?? state.blocksDefaultExpanded;
-  state.compactMode           = document.getElementById('cust-compact-mode')?.checked      ?? state.compactMode;
+  state.groupSequentialBlocks = document.getElementById('cust-group-seq-blocks')?.checked  ?? state.groupSequentialBlocks;
   state.showCharCount         = document.getElementById('cust-char-count')?.checked        ?? state.showCharCount;
   state.fontSize              = document.getElementById('cust-font-size')?.value           ?? state.fontSize;
   state.fontFamily            = document.getElementById('cust-font-family')?.value         ?? state.fontFamily;

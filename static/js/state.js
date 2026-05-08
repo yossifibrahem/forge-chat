@@ -19,9 +19,9 @@ export const CUSTOMIZATION_DEFAULTS = {
   sidebarDefaultOpen:    true,
   showSuggestionChips:   true,
   showTimestamps:        true,
-  blocksDefaultExpanded: false,
-  compactMode:           false,
-  showCharCount:         true,
+  blocksDefaultExpanded:  false,
+  groupSequentialBlocks:  true,
+  showCharCount:          true,
   fontSize:              'medium',    // 'small' | 'medium' | 'large'
   fontFamily:            'sora',      // 'sora' | 'mono' | 'system'
   theme:                 'dark',      // 'dark' | 'light' | 'auto'
