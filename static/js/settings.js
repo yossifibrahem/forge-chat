@@ -13,7 +13,7 @@ export function loadSettings() {
   Object.assign(state, SETTINGS_DEFAULTS, _savedSettings());
 
   const cachedModels = storage.get(STORAGE_KEYS.models);
-  if (cachedModels) renderModelList(cachedModels);
+  renderModelList(cachedModels || []);
 
   _syncAPIUI();
   _syncChatUI();
@@ -53,25 +53,56 @@ function _persistSettings() {
 
 // ── Model list ────────────────────────────────────────────────────────────────
 
+let _modelFetchId = 0;
+
 export async function fetchModels() {
-  showStatus('settings-status', 'Fetching…', 'ok');
+  const fetchId = ++_modelFetchId;
+  const btn = document.getElementById('btn-fetch-models');
+  btn.disabled = true;
+  _setModelStatus('Loading models…', 'Checking the API connection.', 'ok');
+
   try {
     const data = await api.post('/api/models', {
       api_base: document.getElementById('api-base').value.trim(),
       api_key:  document.getElementById('api-key').value.trim(),
     });
-    if (data.error) { showStatus('settings-status', data.error, 'err'); return; }
-    storage.set(STORAGE_KEYS.models, data.models || []);
-    renderModelList(data.models || []);
-    showStatus('settings-status', `${data.models.length} models ✓`, 'ok');
+    if (fetchId !== _modelFetchId) return;
+
+    if (data.error) {
+      _setModelStatus('Could not load models', data.error, 'err');
+      return;
+    }
+
+    const models = data.models || [];
+    storage.set(STORAGE_KEYS.models, models);
+    renderModelList(models);
+    _setModelStatus(models.length ? 'Models loaded' : 'No models found', '', models.length ? 'ok' : 'err');
   } catch (err) {
-    showStatus('settings-status', `Error: ${err.message}`, 'err');
+    if (fetchId === _modelFetchId) _setModelStatus('Could not load models', err.message, 'err');
+  } finally {
+    if (fetchId === _modelFetchId) btn.disabled = false;
   }
 }
 
-export function renderModelList(models) {
-  _renderChips(document.getElementById('model-list'),    'model-chip', models);
-  _renderChips(document.getElementById('mp-model-list'), 'mp-chip',    models);
+export function renderModelList(models = []) {
+  _renderModelRows(document.getElementById('model-list'), models);
+  _renderChips(document.getElementById('mp-model-list'), 'mp-chip', models);
+}
+
+function _renderModelRows(container, models) {
+  if (!container) return;
+  if (!models.length) {
+    container.innerHTML = '<div class="model-empty">No models found</div>';
+    return;
+  }
+
+  container.innerHTML = models.map(m =>
+    `<button class="model-row${m === state.model ? ' selected' : ''}" data-model="${_escape(m)}" title="${_escape(m)}"><span>${_escape(m)}</span></button>`
+  ).join('');
+
+  container.querySelectorAll('.model-row').forEach(row => {
+    row.addEventListener('click', () => _chooseModel(row.dataset.model, models));
+  });
 }
 
 function _renderChips(container, chipClass, models) {
@@ -81,17 +112,31 @@ function _renderChips(container, chipClass, models) {
     return;
   }
   container.innerHTML = models.map(m =>
-    `<div class="${chipClass}${m === state.model ? ' selected' : ''}" data-model="${m}">${m}</div>`
+    `<div class="${chipClass}${m === state.model ? ' selected' : ''}" data-model="${_escape(m)}" title="${_escape(m)}">${_escape(m)}</div>`
   ).join('');
 
   container.querySelectorAll(`.${chipClass}`).forEach(chip => {
-    chip.addEventListener('click', () => {
-      state.model = chip.dataset.model;
-      renderModelList(models);
-      updateModelBadge();
-      saveSettings();
-    });
+    chip.addEventListener('click', () => _chooseModel(chip.dataset.model, models));
   });
+}
+
+function _chooseModel(model, models) {
+  state.model = model;
+  renderModelList(models);
+  updateModelBadge();
+  saveSettings();
+}
+
+function _setModelStatus(title, detail, type) {
+  const el = document.getElementById('settings-status');
+  if (!el) return;
+  el.className = `status-msg ${type}`;
+  el.innerHTML = `<strong>${_escape(title)}</strong>${detail ? `<span>${_escape(detail)}</span>` : ''}`;
+  el.style.display = 'block';
+}
+
+function _escape(value) {
+  return String(value).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
 function updateModelBadge() {

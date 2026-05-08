@@ -270,14 +270,16 @@
               </button>
             </div>
           </div>
-          <div class="btn-row">
-            <button class="btn-secondary" id="btn-fetch-models">
-              <span data-icon="syncIcon"></span>
-              Fetch Models
-            </button>
+          <div class="model-box">
+            <div class="model-box-header">
+              <span>Models</span>
+              <button class="model-refresh-btn" id="btn-fetch-models" title="Fetch models" aria-label="Fetch models">
+                <span data-icon="syncIcon"></span>
+              </button>
+            </div>
+            <div id="settings-status" class="status-msg"></div>
+            <div class="model-list" id="model-list"></div>
           </div>
-          <div id="settings-status" class="status-msg"></div>
-          <div class="model-list" id="model-list"></div>
         </div>
 
         <div class="section-sep"></div>
