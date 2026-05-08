@@ -249,8 +249,15 @@ function toggleCollapsible(block, body, chevron) {
 }
 
 // ── Block Grouping ─────────────────────────────────────────────────────────────
-// Consecutive finalized thinking blocks and tool strips are eagerly collapsed
-// into a single expandable group as each one finishes — not deferred until text.
+// Consecutive thinking blocks and tool strips are collapsed into one expandable group
+// as soon as they appear, then their contents can morph in-place while streaming.
+
+function isGroupableBlock(el) {
+  return !!el && (
+    el.classList.contains('thinking-block') ||
+    el.classList.contains('tool-strip')
+  );
+}
 
 function makeGroupSummary(elements) {
   let thinks = 0, tools = 0;
@@ -271,8 +278,6 @@ function getLastBlockLabel(elements) {
     return last.querySelector('.thinking-label')?.textContent?.trim() || 'Thinking';
   if (last.classList.contains('tool-strip'))
     return last.querySelector('.tr-tool-name')?.textContent?.trim()
-        || last.querySelector('.tc-item-name')?.textContent?.trim()
-        || last.querySelector('.tui-name')?.textContent?.trim()
         || last.dataset.displayName
         || 'Tool';
   return '';
@@ -307,49 +312,39 @@ function createGroupBlock(elements) {
   return group;
 }
 
-/** Re-reads the group body children and refreshes the label + summary in the header. */
 function updateGroupLabel(group) {
-  const body     = group.querySelector('.group-body');
-  const elements = [...body.children];
-  const summary  = makeGroupSummary(elements);
-  const label    = getLastBlockLabel(elements);
-  const lbl = group.querySelector('.group-label');
-  const dsc = group.querySelector('.group-desc');
-  if (lbl) lbl.textContent = label;
-  if (dsc) dsc.textContent = summary;
+  const body     = group?.querySelector('.group-body');
+  const elements = body ? [...body.children].filter(isGroupableBlock) : [];
+  const lbl = group?.querySelector('.group-label');
+  const dsc = group?.querySelector('.group-desc');
+  if (lbl) lbl.textContent = getLastBlockLabel(elements);
+  if (dsc) dsc.textContent = makeGroupSummary(elements);
 }
 
-/**
- * Called immediately after a thinking block or tool strip is fully finalized.
- * Checks the element's previous sibling in the same row:
- *   • previous sibling is a .block-group  → extend that group with this element
- *   • previous sibling is a finished block → create a new group containing both
- *   • otherwise                            → leave the single block ungrouped for now
- * This runs eagerly (one element at a time) so groups grow incrementally during
- * streaming rather than being assembled all at once when text appears.
- */
-function tryGroupAfterFinalize(el) {
+function tryGroupBlock(el) {
+  if (!isGroupableBlock(el)) return;
+
   const row = el.parentElement;
   if (!row) return;
+
+  if (row.classList.contains('group-body')) {
+    updateGroupLabel(row.closest('.block-group'));
+    return;
+  }
 
   const prev = el.previousElementSibling;
   if (!prev) return;
 
   if (prev.classList.contains('block-group')) {
-    // Extend the existing group: move el into its body and refresh the label.
-    const body = prev.querySelector('.group-body');
-    body.appendChild(el);          // moves el out of row and into the group body
+    prev.querySelector('.group-body')?.appendChild(el);
     updateGroupLabel(prev);
-  } else if (prev.classList.contains('thinking-block') ||
-             prev.classList.contains('tool-strip')) {
-    // Two consecutive finished blocks — wrap them in a new collapsed group.
+  } else if (isGroupableBlock(prev)) {
     const group = createGroupBlock([prev, el]);
-    row.insertBefore(group, prev); // insert group at prev's position
+    row.insertBefore(group, prev);
     const body = group.querySelector('.group-body');
-    body.appendChild(prev);        // move prev into group
-    body.appendChild(el);          // move el into group
+    body.appendChild(prev);
+    body.appendChild(el);
   }
-  // Single block with a non-groupable predecessor: leave it in place.
 }
 
 function attachCollapsible(block, { headerSelector, bodySelector, chevronSelector, markManualToggle = false }) {
@@ -395,6 +390,7 @@ export function createThinkingBlock() {
   });
 
   row.appendChild(block);
+  if (state.groupSequentialBlocks) tryGroupBlock(block);
   scrollToBottom();
   return block.querySelector('.thinking-body');
 }
@@ -421,8 +417,8 @@ export function finalizeThinkingBlock(bodyEl, fullText) {
     setVisible(bodyEl, false);
   }
 
-  // Eagerly group this block with any adjacent finished blocks.
-  if (state.groupSequentialBlocks) tryGroupAfterFinalize(block);}
+  updateGroupLabel(block.closest('.block-group'));
+}
 
 function appendThinkingBlock(reasoningText) {
   if (!reasoningText) return;
@@ -446,8 +442,8 @@ function appendThinkingBlock(reasoningText) {
   });
 
   row.appendChild(block);
-  // Eagerly group with adjacent finished blocks (history replay path).
-  if (state.groupSequentialBlocks) tryGroupAfterFinalize(block);
+  // Eagerly group with adjacent blocks (history replay path).
+  if (state.groupSequentialBlocks) tryGroupBlock(block);
   scrollToBottom();
 }
 
@@ -638,8 +634,12 @@ function appendToolResultInline(toolName, args, result, displayName = '') {
     chevronSelector: '.tr-chevron',
   });
   row.appendChild(strip);
-  // Eagerly group with adjacent finished blocks (history replay path).
-  if (state.groupSequentialBlocks) tryGroupAfterFinalize(strip);
+  // Eagerly group with adjacent blocks (history replay path).
+  if (strip.closest('.block-group')) {
+    updateGroupLabel(strip.closest('.block-group'));
+  } else if (state.groupSequentialBlocks) {
+    tryGroupBlock(strip);
+  }
   scrollToBottom();
 }
 
@@ -680,7 +680,7 @@ export function createToolStrip(toolName, displayName = '') {
     <span>using <span class="tui-name">${escapeHtml(displayName || toolName)}</span></span>
     <span class="thinking-pulse"></span>`;
   row.appendChild(strip);
-  if (state.groupSequentialBlocks) tryGroupAfterFinalize(strip);
+  if (state.groupSequentialBlocks) tryGroupBlock(strip);
   scrollToBottom();
   return strip;
 }
@@ -696,12 +696,6 @@ export function toolStripSetApproval(strip, call) {
     strip.dataset.toolName = call.function.name;
     strip.dataset.displayName = displayName;
 
-    // If the strip is inside a group, pop it out so the approval UI is fully visible.
-    const parentGroup = strip.closest('.block-group');
-    if (parentGroup) {
-      parentGroup.after(strip);
-      updateGroupLabel(parentGroup);
-    }
 
     strip.className = 'tool-strip tool-strip-approval tc-item open';
     strip.innerHTML = `
@@ -728,6 +722,8 @@ export function toolStripSetApproval(strip, call) {
       });
     }
 
+    updateGroupLabel(strip.closest('.block-group'));
+
     let settled = false;
     const decide = allowed => {
       if (settled) return;
@@ -744,12 +740,6 @@ export function toolStripSetApproval(strip, call) {
         status.innerHTML = allowed ? `${ICONS.check} allowed` : `${ICONS.close} denied`;
       }
 
-      // Move the strip back into the group now that approval is resolved.
-      if (parentGroup) {
-        parentGroup.querySelector('.group-body').appendChild(strip);
-        updateGroupLabel(parentGroup);
-      }
-
       resolve(allowed);
     };
 
@@ -762,11 +752,6 @@ export function toolStripSetApproval(strip, call) {
   });
 }
 
-/** Refreshes the label of the group containing this strip, if any. */
-function refreshParentGroupLabel(strip) {
-  const group = strip.closest('.block-group');
-  if (group) updateGroupLabel(group);
-}
 
 /** Morphs strip from approval → running state. */
 export function toolStripSetRunning(strip, args = {}) {
@@ -796,7 +781,7 @@ export function toolStripSetRunning(strip, args = {}) {
       chevronSelector: '.tc-item-chevron',
     });
   }
-  refreshParentGroupLabel(strip);
+  updateGroupLabel(strip.closest('.block-group'));
   scrollToBottom();
 }
 export function toolStripFinalize(strip, toolName, args, result, displayName = '') {
@@ -821,7 +806,11 @@ export function toolStripFinalize(strip, toolName, args, result, displayName = '
     chevronSelector: '.tr-chevron',
   });
 
-  refreshParentGroupLabel(strip);
+  if (strip.closest('.block-group')) {
+    updateGroupLabel(strip.closest('.block-group'));
+  } else if (state.groupSequentialBlocks) {
+    tryGroupBlock(strip);
+  }
   scrollToBottom();
 }
 
