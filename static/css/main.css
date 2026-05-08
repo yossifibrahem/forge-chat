@@ -1667,14 +1667,6 @@ html.hide-suggestion-chips #suggestions-bar { display: none !important; }
 .light-preview .tp-ai   { background: #fff; }
 .light-preview .tp-user { background: rgba(201,169,110,.35); }
 
-/* Auto preview — split diagonally */
-.auto-preview {
-  background: linear-gradient(135deg, #111210 50%, #f5f4f1 50%);
-}
-.auto-preview .tp-bar  { background: rgba(150,150,140,.3); }
-.auto-preview .tp-ai   { background: rgba(150,150,140,.2); }
-.auto-preview .tp-user { background: rgba(201,169,110,.3); }
-
 .theme-card span {
   font-size: .76rem; color: var(--text2);
 }

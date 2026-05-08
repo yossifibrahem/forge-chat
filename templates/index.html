@@ -61,9 +61,6 @@
 
     // Theme
     var theme = prefs.theme || 'dark';
-    if (theme === 'auto') {
-      theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-    }
     r.setAttribute('data-theme', theme);
 
     // Font family
@@ -372,15 +369,7 @@
               </div>
               <span>Light</span>
             </label>
-            <label class="theme-card" data-theme="auto">
-              <input type="radio" name="cust-theme" value="auto" />
-              <div class="theme-card-preview auto-preview">
-                <div class="tp-bar"></div>
-                <div class="tp-msg tp-ai"></div>
-                <div class="tp-msg tp-user"></div>
-              </div>
-              <span>Auto</span>
-            </label>
+
           </div>
         </div>
 

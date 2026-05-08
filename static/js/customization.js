@@ -8,7 +8,7 @@ import { showToast } from './ui.js';
 // Reads from `state` and pushes every setting into the live DOM.
 
 export function applyCustomization() {
-  // Theme (light/dark/auto)
+  // Theme (light/dark)
   _applyTheme(state.theme || 'dark');
 
   // Font size
@@ -39,11 +39,7 @@ export function applyCustomization() {
 }
 
 function _applyTheme(theme) {
-  let effective = theme;
-  if (theme === 'auto') {
-    effective = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-  }
-  document.documentElement.setAttribute('data-theme', effective);
+  document.documentElement.setAttribute('data-theme', theme);
 }
 
 function _applyFontFamily(family) {
@@ -75,13 +71,6 @@ export function loadCustomization() {
   Object.assign(state, { ...CUSTOMIZATION_DEFAULTS, ...saved });
   applyCustomization();
   syncCustomizationUI();
-
-  // If auto theme, re-apply when OS preference changes
-  if (state.theme === 'auto') {
-    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
-      if (state.theme === 'auto') _applyTheme('auto');
-    });
-  }
 }
 
 // ── Save ──────────────────────────────────────────────────────────────────────
