@@ -21,26 +21,28 @@ import { escapeHtml } from '../mcp_tool_ui.js';
 const EXA_STYLES = `
   .exa-results {
     display: grid;
-    gap: 3px;
+    gap: 6px;
     max-height: 300px;
     overflow-y: auto;
+    padding-right: 2px;
     scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+    scrollbar-color: var(--border2) transparent;
   }
-  .exa-results::-webkit-scrollbar { width: 3px; }
-  .exa-results::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  .exa-results::-webkit-scrollbar { width: 4px; }
+  .exa-results::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 999px; }
 
   .exa-card {
     display: block;
-    padding: 7px 9px;
-    background: transparent;
+    padding: 8px 9px;
     border: 1px solid var(--border);
-    border-radius: 7px;
-    text-decoration: none;
+    border-radius: var(--radius-sm);
+    background: var(--code-bg);
     color: inherit;
-    transition: border-color var(--fast);
+    text-decoration: none;
+    transition: background var(--fast), border-color var(--fast), color var(--fast);
   }
   .exa-card:hover {
+    background: var(--surface2);
     border-color: var(--border2);
   }
 
@@ -48,7 +50,11 @@ const EXA_STYLES = `
     display: flex;
     align-items: center;
     gap: 5px;
-    margin-bottom: 3px;
+    min-width: 0;
+    margin-bottom: 4px;
+    font-family: var(--font-mono);
+    font-size: .62rem;
+    color: var(--text3);
   }
 
   .exa-favicon {
@@ -57,41 +63,37 @@ const EXA_STYLES = `
     border-radius: 2px;
     flex-shrink: 0;
     object-fit: contain;
-    opacity: .65;
+    opacity: .7;
   }
 
   .exa-card-domain {
-    font-family: var(--font-mono);
-    font-size: .62rem;
-    color: var(--text3);
-    white-space: nowrap;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex: 1;
-    min-width: 0;
+    white-space: nowrap;
+    color: var(--text2);
   }
 
   .exa-card-date {
-    font-family: var(--font-mono);
-    font-size: .62rem;
-    color: var(--text3);
     flex-shrink: 0;
+    color: var(--text3);
   }
 
   .exa-card-title {
-    font-size: .75rem;
-    color: var(--text2);
+    color: var(--text);
+    font-size: .76rem;
     font-weight: 500;
-    white-space: nowrap;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.3;
   }
 
   .exa-card-snippet {
-    margin-top: 3px;
-    font-size: .73rem;
+    margin: 4px 0 0;
     color: var(--text3);
+    font-size: .72rem;
     line-height: 1.5;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -100,16 +102,16 @@ const EXA_STYLES = `
   }
 
   .exa-card-fetch .exa-card-snippet {
-    -webkit-line-clamp: 4;
+    -webkit-line-clamp: 5;
     white-space: pre-wrap;
     word-break: break-word;
   }
 
   .exa-no-results {
+    padding: 4px 2px;
+    color: var(--text3);
     font-family: var(--font-mono);
     font-size: .72rem;
-    color: var(--text3);
-    padding: 4px 2px;
   }
 `;
 
@@ -177,7 +179,7 @@ function buildCard(r, fetchVariant = false) {
              loading="lazy"
              onerror="this.style.display='none'" />
         <span class="exa-card-domain">${escapeHtml(domain)}</span>
-        ${r.date ? `<span class="exa-card-date">${escapeHtml(r.date)}</span>` : ''}
+        ${r.date ? `<span class="exa-card-date">· ${escapeHtml(r.date)}</span>` : ''}
       </div>
       <div class="exa-card-title">${escapeHtml(r.title || r.url)}</div>
       ${snippet ? `<p class="exa-card-snippet">${escapeHtml(snippet)}</p>` : ''}

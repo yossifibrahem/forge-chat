@@ -2,17 +2,9 @@
 
 /* ─── Workspace files panel ──────────────────────────────────────────────── */
 #btn-toggle-files {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
   color: var(--text2);
-  transition: color var(--fast), background var(--fast), transform var(--fast);
 }
-#btn-toggle-files:hover,
+#btn-toggle-files:hover { color: var(--text); background: var(--surface2); }
 #btn-toggle-files.active { color: var(--accent); background: var(--accent-dim); }
 #btn-toggle-files svg { width: 16px; height: 16px; }
 
@@ -99,15 +91,7 @@ body.file-panel-resizing { cursor: col-resize; user-select: none; }
 .file-preview-actions { display: flex; align-items: center; gap: 4px; }
 .file-panel-actions button,
 .file-preview-actions button {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
   color: var(--text3);
-  transition: color var(--fast), background var(--fast), opacity var(--fast);
 }
 .file-panel-actions button:hover,
 .file-preview-actions button:hover:not(:disabled) { color: var(--text); background: var(--surface3); }
@@ -122,13 +106,6 @@ body.file-panel-resizing { cursor: col-resize; user-select: none; }
   overflow: auto;
   padding: 8px;
 }
-#file-panel-list::-webkit-scrollbar,
-#file-preview-body::-webkit-scrollbar,
-.file-code-preview::-webkit-scrollbar { width: 4px; height: 4px; }
-#file-panel-list::-webkit-scrollbar-thumb,
-#file-preview-body::-webkit-scrollbar-thumb,
-.file-code-preview::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 999px; }
-
 .file-row {
   width: 100%;
   display: flex;

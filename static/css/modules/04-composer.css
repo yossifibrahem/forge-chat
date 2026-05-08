@@ -131,7 +131,7 @@
   max-width: 200px;
   transition: color var(--fast), background var(--fast);
 }
-#model-badge:hover { color: var(--text); background: rgba(42,44,37,.8); }
+#model-badge:hover { color: var(--text); background: var(--surface3); }
 .model-icon { display: inline-flex; width: 12px; height: 12px; opacity: .6; flex-shrink: 0; }
 #model-badge.open .model-icon { opacity: 1; }
 #model-badge.open { color: var(--accent); background: var(--accent-dim); }
@@ -234,6 +234,7 @@
 }
 .suggestion-chip:hover {
   border-color: var(--border2);
+  background: var(--surface2);
   color: var(--text);
 }
 .suggestion-chip svg { width: 12px; height: 12px; opacity: .6; }

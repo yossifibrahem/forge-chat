@@ -25,6 +25,8 @@
   --text3: #5a5850;
   --code-bg: #0d0e0c;
   --radius: 10px;
+  --radius-sm: 7px;
+  --radius-md: 8px;
   --sidebar-w: 260px;
   --content-w: 820px;
   --dock-w: 760px;
@@ -75,7 +77,10 @@ svg { flex-shrink: 0; }
 .tc-item-args::-webkit-scrollbar,
 .tr-args::-webkit-scrollbar,
 .tr-result::-webkit-scrollbar,
-.modal-body::-webkit-scrollbar { width: 4px; }
+.modal-body::-webkit-scrollbar,
+#file-panel-list::-webkit-scrollbar,
+#file-preview-body::-webkit-scrollbar,
+.file-code-preview::-webkit-scrollbar { width: 4px; height: 4px; }
 
 #conv-list::-webkit-scrollbar-thumb,
 #mp-model-list::-webkit-scrollbar-thumb,
@@ -86,19 +91,22 @@ svg { flex-shrink: 0; }
 .tc-item-args::-webkit-scrollbar-thumb,
 .tr-args::-webkit-scrollbar-thumb,
 .tr-result::-webkit-scrollbar-thumb,
-.modal-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 999px; }
+.modal-body::-webkit-scrollbar-thumb,
+#file-panel-list::-webkit-scrollbar-thumb,
+#file-preview-body::-webkit-scrollbar-thumb,
+.file-code-preview::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 999px; }
 
-:is(#btn-toggle-sidebar, .modal-close, .conv-del, #attach-btn, #mic-btn, #send-btn, #stop-btn, .msg-action-btn, .tc-allow, .tc-deny, .btn-primary, .btn-secondary, .modal-tab, .sidebar-action, #btn-new-chat, #model-badge, .mp-chip, .model-chip) {
+:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .conv-del, #attach-btn, #mic-btn, #send-btn, #stop-btn, .file-panel-actions button, .file-preview-actions button, .msg-action-btn, .tc-allow, .tc-deny, .btn-primary, .btn-secondary, .modal-tab, .sidebar-action, #btn-new-chat, #model-badge, .mp-chip, .model-chip, .model-row, .model-refresh-btn, .server-icon-btn, .icon-option, .eye-btn, .file-row, .suggestion-chip, .code-copy, .img-preview-remove) {
   transition: color var(--fast), background var(--fast), border-color var(--fast), opacity var(--fast), transform var(--fast), box-shadow var(--fast);
 }
 
-:is(#btn-toggle-sidebar, .modal-close, .conv-del, #attach-btn, #mic-btn, #send-btn, #stop-btn) {
+:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .conv-del, #attach-btn, #mic-btn, #send-btn, #stop-btn, .file-panel-actions button, .file-preview-actions button, .model-refresh-btn) {
   display: grid;
   place-items: center;
   border: none;
 }
 
-:is(#btn-toggle-sidebar, .modal-close, .conv-del, #attach-btn, #mic-btn, .msg-action-btn, .tc-allow, .tc-deny, .modal-tab) {
+:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .conv-del, #attach-btn, #mic-btn, .file-panel-actions button, .file-preview-actions button, .msg-action-btn, .tc-allow, .tc-deny, .modal-tab, .model-refresh-btn, .eye-btn) {
   background: none;
 }
 
@@ -127,6 +135,18 @@ svg { flex-shrink: 0; }
   cursor: pointer;
 }
 :is(.thinking-header, .tc-item-header, .tr-summary, .group-header):hover { color: var(--text); }
+
+:is(button, [role="button"], input, textarea, select, .mp-chip, .model-chip, .model-row, .file-row):focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .model-refresh-btn, .file-panel-actions button, .file-preview-actions button) {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+}
 
 :is(.thinking-chevron, .tc-item-chevron, .tr-chevron, .group-chevron) {
   color: var(--text3);
@@ -172,5 +192,5 @@ svg { flex-shrink: 0; }
   border-radius: 8px;
   background: var(--surface2);
 }
-:is(.field input, .field select, .field textarea, #mcp-config-editor):focus { border-color: var(--accent-border); }
+:is(.field input, .field select, .field textarea, #mcp-config-editor, .msg-edit-textarea, #conv-search, #cust-accent-hex):focus { border-color: var(--accent-border); }
 

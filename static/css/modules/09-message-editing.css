@@ -5,11 +5,11 @@
 .msg-edit-textarea { min-height: 60px; padding: 10px 12px; resize: vertical; border-color: var(--accent); font-size: .9rem; line-height: 1.6; font-family: var(--font-mono); }
 .msg-edit-textarea:focus { box-shadow: 0 0 0 3px var(--accent-dim); }
 .msg-edit-actions { display: flex; justify-content: flex-end; gap: 6px; }
-.msg-edit-save, .msg-edit-cancel { padding: 5px 12px; border: none; border-radius: 5px; font-family: var(--font-mono); font-size: .7rem; cursor: pointer; transition: all var(--fast); }
-.msg-edit-save { background: var(--accent); color: #fff; }
-.msg-edit-save:hover { filter: brightness(1.15); }
-.msg-edit-cancel { background: var(--surface3); color: var(--text2); }
-.msg-edit-cancel:hover { color: var(--text); }
+.msg-edit-save, .msg-edit-cancel { min-height: 30px; padding: 6px 12px; border: 1px solid transparent; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: .7rem; cursor: pointer; transition: color var(--fast), background var(--fast), border-color var(--fast), opacity var(--fast), transform var(--fast); }
+.msg-edit-save { background: var(--accent); color: var(--bg); }
+.msg-edit-save:hover { opacity: .9; transform: translateY(-1px); }
+.msg-edit-cancel { border-color: var(--border); background: var(--surface2); color: var(--text2); }
+.msg-edit-cancel:hover { border-color: var(--border2); background: var(--surface3); color: var(--text); }
 .msg-edit-attachments { margin-top: 0; margin-bottom: 0; }
 .msg-edit-image-card, .msg-edit-file-card { opacity: .9; }
 .msg-edit-image-thumb { opacity: .86; }

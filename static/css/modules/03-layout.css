@@ -19,7 +19,7 @@
   background: var(--bg);
   flex-shrink: 0;
 }
-#btn-toggle-sidebar { padding: 5px; border-radius: 6px; color: var(--text2); }
+#btn-toggle-sidebar { color: var(--text2); }
 #btn-toggle-sidebar:hover { background: var(--surface2); color: var(--text); }
 #btn-toggle-sidebar svg { width: 17px; height: 17px; }
 #chat-title-input {
