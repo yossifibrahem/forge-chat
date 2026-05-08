@@ -60,7 +60,7 @@
     }
 
     // Theme
-    var theme = prefs.theme || 'dark';
+    var theme = prefs.theme || 'auto';
     if (theme === 'auto') {
       theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
@@ -363,15 +363,6 @@
               </div>
               <span>Dark</span>
             </label>
-            <label class="theme-card" data-theme="light">
-              <input type="radio" name="cust-theme" value="light" />
-              <div class="theme-card-preview light-preview">
-                <div class="tp-bar"></div>
-                <div class="tp-msg tp-ai"></div>
-                <div class="tp-msg tp-user"></div>
-              </div>
-              <span>Light</span>
-            </label>
             <label class="theme-card" data-theme="auto">
               <input type="radio" name="cust-theme" value="auto" />
               <div class="theme-card-preview auto-preview">
@@ -380,6 +371,15 @@
                 <div class="tp-msg tp-user"></div>
               </div>
               <span>Auto</span>
+            </label>
+            <label class="theme-card" data-theme="light">
+              <input type="radio" name="cust-theme" value="light" />
+              <div class="theme-card-preview light-preview">
+                <div class="tp-bar"></div>
+                <div class="tp-msg tp-ai"></div>
+                <div class="tp-msg tp-user"></div>
+              </div>
+              <span>Light</span>
             </label>
           </div>
         </div>
