@@ -218,7 +218,6 @@ def _run_mcp_call(conv_id: str, tool_meta: dict, call: dict) -> tuple[dict, str]
                 server_config,
                 name,
                 args,
-                working_dir=str(store.working_directory(conv_id)) if conv_id else None,
                 conv_id=conv_id,
             )
         )

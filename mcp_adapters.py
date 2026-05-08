@@ -1,9 +1,4 @@
-"""MCP process launch helpers.
-
-Host runtime is the default. A server runs in the per-chat Docker container only
-when its config explicitly says ``"runtime": "container"`` or legacy
-``"sandbox": true``.
-"""
+"""MCP process launch helpers — all servers run in the per-chat Docker container."""
 from __future__ import annotations
 
 import logging
@@ -23,22 +18,6 @@ class ContainerConversationRequired(RuntimeError):
     """Raised when a container-runtime MCP server is used without a chat id."""
 
 
-def server_runtime(server_config: dict) -> str:
-    configured = str(server_config.get("runtime", "")).strip().lower()
-    if configured in {"container", "docker", "sandbox"}:
-        return "container"
-    if configured in {"host", "local", "plain", ""}:
-        return "host"
-    if server_config.get("sandbox") is True:
-        return "container"
-    log.warning("Unknown MCP runtime %r; using host", configured)
-    return "host"
-
-
-def uses_container(server_config: dict) -> bool:
-    return server_runtime(server_config) == "container"
-
-
 def conversation_working_directory(conversation_id: str) -> Path:
     """Return the host-side workspace mounted as /workspace in containers."""
     return container_service.conversation_workspace(conversation_id)
@@ -55,20 +34,13 @@ def expand_config_env(env: dict | None) -> dict:
 def apply_workspace_process_options(
     params: dict[str, Any],
     env: dict[str, Any],
-    working_dir: str | None,
     *,
     server_name: str = "",
     server_config: dict | None = None,
     conv_id: str = "",
 ) -> None:
-    """Mutate StdioServerParameters kwargs for host or container runtime."""
-    server_config = server_config or {}
-
-    if uses_container(server_config):
-        _apply_container(params, env, server_name, server_config, conv_id)
-        return
-
-    _apply_host(params, env, working_dir)
+    """Mutate StdioServerParameters kwargs to run the MCP server in the conversation container."""
+    _apply_container(params, env, server_name, server_config or {}, conv_id)
 
 
 def _apply_container(
@@ -80,7 +52,7 @@ def _apply_container(
 ) -> None:
     if not conv_id:
         raise ContainerConversationRequired(
-            f"MCP server '{server_name}' uses container runtime, but no conversation id was provided."
+            f"MCP server '{server_name}' requires a conversation to be open."
         )
 
     extra_volumes = extract_host_mounts(server_config)
@@ -102,28 +74,9 @@ def _apply_container(
     params["command"] = command
     params["args"] = args
 
-    # Keep docker client env minimal and predictable. Explicit MCP env values are
-    # injected into the container by docker exec --env above.
     env.clear()
     env.update(os.environ)
     params.pop("cwd", None)
-
-
-def _apply_host(params: dict[str, Any], env: dict[str, Any], working_dir: str | None) -> None:
-    resolved = _resolve_working_dir(working_dir)
-    if not resolved:
-        return
-    env["WORKING_DIR"] = resolved
-    env["PWD"] = resolved
-    params["cwd"] = resolved
-
-
-def _resolve_working_dir(working_dir: str | None) -> str | None:
-    if not working_dir:
-        return None
-    path = Path(os.path.expanduser(working_dir)).resolve()
-    path.mkdir(parents=True, exist_ok=True)
-    return str(path)
 
 
 def extract_host_mounts(server_config: dict) -> list[str]:

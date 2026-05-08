@@ -10,7 +10,7 @@ Lumen is a self-hosted Flask chat UI for OpenAI-compatible chat-completions APIs
 - OpenAI-compatible model settings from the browser UI
 - Local filesystem conversation persistence under `~/.lumen/`
 - Per-conversation workspace directories mounted as `/workspace`
-- Optional Docker sandbox containers per conversation
+- Docker sandbox containers per conversation
 - MCP server configuration through `mcp.json` and the UI
 - MCP tool discovery, tool-call execution, approval/deny UI, and tool-result rendering
 - Image uploads stored by content hash
@@ -32,7 +32,7 @@ The app is intentionally lightweight: no database, no build step, no frontend fr
 ├── container_service.py           # Docker container lifecycle and command wrapping
 ├── workspace_service.py           # Workspace listing, reading, upload, download path safety
 ├── store.py                       # Filesystem persistence for conversations and images
-├── Dockerfile.sandbox             # Optional per-chat sandbox image
+├── Dockerfile.sandbox             # Required per-chat sandbox image
 ├── requirements.txt               # Flask, CORS, OpenAI SDK, MCP SDK
 ├── README.md                      # User-facing project description and setup docs
 ├── templates/index.html           # Full app shell and modal markup
@@ -78,7 +78,7 @@ Open:
 http://localhost:8080
 ```
 
-Optional sandbox image:
+Required sandbox image (build once before first run):
 
 ```bash
 docker build -f Dockerfile.sandbox -t lumen-sandbox .
@@ -205,30 +205,14 @@ The generator yields already-formatted SSE strings, so callers parse those strin
 - Persists `mcp.json` in the project root.
 - Validates only the top-level shape: `{"mcpServers": {...}}`.
 - Connects to each MCP server through stdio.
-- Uses `mcp_adapters.apply_workspace_process_options()` to decide host vs. container runtime details.
+- Uses `mcp_adapters.apply_workspace_process_options()` to configure the container runtime for each MCP server.
 - `fetch_tools()` returns OpenAI-tool-like metadata for the frontend.
 - `invoke_tool()` returns text output by joining result content blocks.
 - `run_async()` bridges async MCP calls into Flask sync route/service code.
 
 ### `mcp_adapters.py`
 
-MCP servers run on the host by default. A server runs inside the per-chat Docker container only when its config includes either:
-
-```json
-{"runtime": "container"}
-```
-
-or the legacy:
-
-```json
-{"sandbox": true}
-```
-
-Host runtime:
-
-- Sets `WORKING_DIR` and `PWD` to the conversation workspace.
-- Attempts to set `cwd` on `StdioServerParameters`.
-- Falls back if the MCP SDK rejects unknown fields.
+All MCP servers run inside the per-conversation Docker container. There is no host runtime fallback.
 
 Container runtime:
 
@@ -345,7 +329,7 @@ Do not assume they have the same indices. Use helper mapping logic when editing/
 `mcp_policy.js` injects model instructions when MCP tools are enabled. It tells the model:
 
 - Which tools are available.
-- Workspace semantics for host/container runtimes.
+- Workspace semantics for the container runtime.
 - To include a concise `description` argument first for each MCP tool call.
 - To view files before and after filesystem edits.
 - To use `file:/workspace/...` links only for real workspace files.
@@ -386,28 +370,30 @@ Only use `file:/workspace/...` links for files that already exist in the active 
 
 ## MCP config shape
 
-Basic host-runtime server:
+All MCP servers run in the per-conversation container. A typical server configuration:
 
 ```json
 {
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp/workspace"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
     }
   }
 }
 ```
 
-Container-runtime server:
+With explicit environment variables:
 
 ```json
 {
   "mcpServers": {
-    "filesystem-container": {
-      "runtime": "container",
+    "search": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "your-key-here"
+      }
     }
   }
 }
@@ -426,7 +412,7 @@ Follow the existing separation of concerns:
 - Prefer adding frontend tool adapters for tool-specific UI instead of hardcoding tool names in renderer logic.
 - Keep workspace path handling strict. Do not weaken traversal checks.
 - Avoid introducing a frontend build step unless the whole project intentionally moves that direction.
-- Remember that MCP servers may run on the host or in Docker; test both when touching MCP launch code.
+- Remember that MCP servers always run in Docker; ensure the sandbox image is built and Docker is running before testing MCP behaviour.
 - Be cautious with module-level Python state if changing deployment assumptions; multi-worker servers will not share active streams/cancellation events.
 
 ## Manual verification checklist
@@ -459,43 +445,26 @@ There is no bundled test suite. At minimum, after edits, verify:
 14. Tool calls render `tool_start`, approval, running, and final result states.
 15. Auto-approved tool calls skip approval and still render running/result states.
 16. Reopening a conversation during an active stream can reattach if still in the same backend process.
-17. Docker sandbox MCP server works when `runtime: "container"` and the image exists.
+17. Docker container is created for a new conversation and MCP tools are discoverable once the conversation is open.
 
 Recommended future tests:
 
 - Flask route tests with `pytest` and Flask test client.
 - Unit tests for `workspace_service.workspace_relpath()` and `resolve_workspace_path()`.
 - Unit tests for `store.save_image()` and invalid image handling.
-- Unit tests for `mcp_adapters.server_runtime()` and host/container launch parameter mutation.
+- Unit tests for `mcp_adapters.apply_workspace_process_options()` and container launch parameter mutation.
 - Integration-ish tests for chat stream event ordering using mocked OpenAI streams.
 
 ## Known issues and things to inspect before feature work
 
 These were found during the repository pass and should be verified/fixed before relying heavily on MCP tool calls:
 
-### 1. Duplicate positional argument in `chat_turn_service._run_mcp_call()`
+### 1. ~~Duplicate positional argument in `chat_turn_service._run_mcp_call()`~~ (resolved)
 
-Current code calls `mcp_service.invoke_tool()` with `args` twice:
-
-```python
-mcp_service.invoke_tool(
-    server_name,
-    server_config,
-    name,
-    args,
-    args,
-    working_dir=...,
-    conv_id=conv_id,
-)
-```
-
-But `invoke_tool()` is defined as:
+This was a documented bug where `args` was passed twice to `invoke_tool()`. The call now matches the current signature:
 
 ```python
-async def invoke_tool(server_name, server_config, tool_name, arguments, *, working_dir=None, conv_id="")
-```
-
-That extra positional `args` should be removed. As written, MCP tool calls from assistant turns can fail with a positional-argument error.
+async def invoke_tool(server_name, server_config, tool_name, arguments, *, conv_id="")
 
 ### 2. Undefined `stripIndex` in `static/js/chat.js`
 
@@ -541,8 +510,7 @@ When changing chat streaming:
 
 When changing MCP:
 
-- Test host runtime.
-- Test container runtime if Docker is available.
+- Test container runtime with Docker running.
 - Test approval and auto-approval.
 - Test tool display labels and result rendering.
 - Avoid assuming all MCP result content is JSON.

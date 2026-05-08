@@ -45,14 +45,12 @@ def find_server(server_name: str) -> dict | None:
     return load_config().get("mcpServers", {}).get(server_name)
 
 
-
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 def _build_server_params(
     server_name: str,
     server_config: dict,
     *,
-    working_dir: str | None = None,
     conv_id: str = "",
 ) -> Any:
     from mcp import StdioServerParameters  # optional dependency
@@ -66,19 +64,11 @@ def _build_server_params(
     apply_workspace_process_options(
         params,
         env,
-        working_dir,
         server_name=server_name,
         server_config=server_config,
         conv_id=conv_id,
     )
-
-    try:
-        return StdioServerParameters(**params)
-    except Exception:
-        # Some older SDK builds reject unknown fields such as `cwd`. Retry with
-        # the portable env-only shape. WORKING_DIR/PWD remain in env.
-        params.pop("cwd", None)
-        return StdioServerParameters(**params)
+    return StdioServerParameters(**params)
 
 
 # ── Async operations ──────────────────────────────────────────────────────────
@@ -106,12 +96,12 @@ async def fetch_tools(server_name: str, server_config: dict, conv_id: str = "") 
     return tools
 
 
-async def invoke_tool(server_name: str, server_config: dict, tool_name: str, arguments: dict, *, working_dir: str | None = None, conv_id: str = "") -> str:
+async def invoke_tool(server_name: str, server_config: dict, tool_name: str, arguments: dict, *, conv_id: str = "") -> str:
     """Call a single MCP tool and return its text output."""
     from mcp import ClientSession
     from mcp.client.stdio import stdio_client
 
-    params = _build_server_params(server_name, server_config, working_dir=working_dir, conv_id=conv_id)
+    params = _build_server_params(server_name, server_config, conv_id=conv_id)
     try:
         async with stdio_client(params) as (reader, writer):
             async with ClientSession(reader, writer) as session:

@@ -171,7 +171,6 @@ def call_mcp_tool():
             server_config,
             body.get("tool", ""),
             body.get("arguments", {}),
-            working_dir=str(store.working_directory(conv_id)) if conv_id else None,
             conv_id=conv_id,
         ))
     except ContainerConversationRequired as exc:

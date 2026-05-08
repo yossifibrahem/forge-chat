@@ -1,6 +1,6 @@
 # Lumen AI Chat
 
-A self-hosted Flask chatbot interface for OpenAI-compatible models, with real-time streaming, local conversation persistence, per-conversation file workspaces, optional Docker sandboxes, and Model Context Protocol (MCP) server support.
+A self-hosted Flask chatbot interface for OpenAI-compatible models, with real-time streaming, local conversation persistence, per-conversation file workspaces, Docker-sandboxed MCP execution, and Model Context Protocol (MCP) server support.
 
 Lumen is designed for developers who want a capable local AI chat app without a heavy framework stack. The backend is plain Flask, the frontend is browser-native JavaScript modules, and all persistent data is stored on the local filesystem.
 
@@ -14,7 +14,7 @@ The application focuses on three core ideas:
 
 1. **Local-first control** — conversations, uploads, images, and workspaces are stored locally under `~/.lumen/` by default.
 2. **Tool-ready chat** — MCP servers can be configured from the UI or through `mcp.json`, allowing the model to discover and call external tools.
-3. **Safer experimentation** — each conversation can use an isolated workspace and optional Docker-backed sandbox for generated files and code execution.
+3. **Safer experimentation** — each conversation runs MCP servers inside an isolated Docker-backed sandbox, keeping generated files and code execution separate from the host machine.
 
 The project intentionally avoids a frontend build pipeline. The UI is served directly by Flask from `templates/` and `static/`, making it simple to run, inspect, and modify.
 
@@ -37,8 +37,8 @@ The project intentionally avoids a frontend build pipeline. The UI is served dir
 - **Per-conversation workspaces**  
   Every conversation gets an isolated workspace directory that can store uploaded files, generated outputs, and files used by tools.
 
-- **Optional Docker sandbox containers**  
-  Docker-backed containers can mount the conversation workspace at `/workspace`, helping isolate code execution from the host machine.
+- **Docker sandbox containers**  
+  Every MCP server runs inside a per-conversation Docker container with the workspace mounted at `/workspace`, isolating code execution from the host machine.
 
 - **Workspace file browser**  
   Upload, list, preview, and download files from the browser UI.
@@ -99,7 +99,7 @@ Then open the settings panel, enter your API key, base URL, and model name, and 
 | --- | --- | --- | --- |
 | Python | 3.10+ recommended | Yes | Flask backend runtime |
 | pip | Latest recommended | Yes | Installs Python dependencies |
-| Docker | 20.10+ recommended | Optional | Needed only for sandbox containers |
+| Docker | 20.10+ recommended | Yes | Required for MCP sandbox containers |
 | Node.js / npm | Current LTS recommended | Optional | Needed for MCP servers launched through commands such as `npx` |
 | OpenAI-compatible API | Provider-dependent | Yes | OpenAI, local model server, or compatible proxy |
 
@@ -121,9 +121,9 @@ openai>=1.30.0
 mcp>=1.0.0
 ```
 
-### Optional Docker sandbox setup
+### Docker sandbox setup
 
-Lumen can start per-conversation Docker containers using the image name configured by `LUMEN_SANDBOX_IMAGE`. The default image name is `lumen-sandbox`.
+Lumen runs all MCP servers inside per-conversation Docker containers. The sandbox image must be built before starting the app. The image name is configured by `LUMEN_SANDBOX_IMAGE` (default: `lumen-sandbox`).
 
 Build the sandbox image from the project root:
 
@@ -131,7 +131,7 @@ Build the sandbox image from the project root:
 docker build -f Dockerfile.sandbox -t lumen-sandbox .
 ```
 
-Docker is not required for basic chat, conversation storage, image upload, or host-based MCP servers.
+The app will refuse to start if Docker is unreachable or if the sandbox image has not been built.
 
 ### Production-style run
 
@@ -239,25 +239,31 @@ Example `mcp.json`:
 }
 ```
 
-MCP servers run on the host by default. To run a server inside the conversation's Docker sandbox, add `"runtime": "container"` to that server configuration:
+All MCP servers run inside the conversation's Docker sandbox container, with the workspace mounted at `/workspace`. A basic server configuration looks like this:
 
 ```json
 {
   "mcpServers": {
-    "sandbox-filesystem": {
-      "runtime": "container",
+    "filesystem": {
       "command": "npx",
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
         "/workspace"
       ]
+    },
+    "search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "your-api-key-here"
+      }
     }
   }
 }
 ```
 
-When a conversation is active, its workspace is available as `/workspace` inside the sandbox container.
+The conversation workspace is available as `/workspace` inside the container. Prefer `/workspace`-relative paths in server arguments rather than host-absolute paths.
 
 ---
 
@@ -295,27 +301,21 @@ Workspace paths are normalized to `/workspace/...` for safe tool and sandbox usa
 
 ### Use MCP tools in a conversation
 
-1. Open the MCP settings panel.
-2. Add an MCP server command, arguments, and optional environment variables.
-3. Save the configuration.
-4. Load or refresh available tools.
-5. Ask the assistant to use one of the tools.
-6. Approve or deny the tool call when prompted, unless auto-approval is enabled for that server.
-
-Tool activity is shown inline in the chat, including tool names, arguments, status, and results.
-
-### Run tools inside a sandbox container
-
-1. Build the sandbox image:
+1. Build the sandbox image (first time only):
 
    ```bash
    docker build -f Dockerfile.sandbox -t lumen-sandbox .
    ```
 
-2. Configure an MCP server with `"runtime": "container"`.
-3. Start a conversation and ask the assistant to use the configured tool.
+2. Start the app — Docker availability and the sandbox image are validated at startup.
+3. Open the MCP settings panel.
+4. Add an MCP server command, arguments, and optional environment variables.
+5. Save the configuration.
+6. Load or refresh available tools — a conversation must be open for tool discovery to work.
+7. Ask the assistant to use one of the tools.
+8. Approve or deny the tool call when prompted, unless auto-approval is enabled for that server.
 
-The container gets access to the conversation workspace mounted at `/workspace`.
+Tool activity is shown inline in the chat, including tool names, arguments, status, and results. All tool execution happens inside the conversation's Docker container with the workspace mounted at `/workspace`.
 
 ### Cancel a streaming response
 
@@ -393,7 +393,7 @@ Manual smoke test checklist before opening a pull request:
 - Conversation reload preserves messages
 - File upload/list/preview/download works
 - MCP config can be saved and tools can be listed
-- Docker sandbox behavior still works if Docker-related code was changed
+- Docker is running and the sandbox image exists before starting the app
 
 ---
 
