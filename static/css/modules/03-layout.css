@@ -1,0 +1,73 @@
+/* Main shell, chat header, message viewport, and empty state. */
+
+/* ─── Main layout & header ─────────────────────────────────────────────────── */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: var(--vvh, 100dvh);
+  overflow: hidden;
+  position: relative;
+  transition: margin-left .28s var(--ease);
+}
+#chat-header {
+  height: calc(54px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg);
+  flex-shrink: 0;
+}
+#btn-toggle-sidebar { padding: 5px; border-radius: 6px; color: var(--text2); }
+#btn-toggle-sidebar:hover { background: var(--surface2); color: var(--text); }
+#btn-toggle-sidebar svg { width: 17px; height: 17px; }
+#chat-title-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font-size: .88rem;
+  font-weight: 500;
+}
+#chat-title-input::placeholder { color: var(--text3); font-weight: 400; }
+.header-actions { gap: 6px; }
+
+/* ─── Messages ─────────────────────────────────────────────────────────────── */
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0 180px;
+  scroll-behavior: smooth;
+}
+
+/* ─── Empty state ──────────────────────────────────────────────────────────── */
+#empty-state {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 240px; /* push heading up to make room for centered dock */
+  text-align: center;
+  animation: fadeUp .3s ease both;
+}
+.es-logo {
+  margin-bottom: 6px;
+  color: var(--text);
+  font-family: var(--font-tiempos);
+  font-size: 2.2rem;
+  opacity: .5;
+}
+.es-logo em { opacity: 1; }
+.es-sub {
+  color: var(--text3);
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  letter-spacing: .3px;
+}
+/* Suggestion chips in empty state are handled via #suggestions-bar */
+.es-prompts { display: none; }
+

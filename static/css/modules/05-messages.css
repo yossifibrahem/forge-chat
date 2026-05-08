@@ -1,0 +1,146 @@
+/* Chat messages, markdown rendering, code blocks, links, and message attachments. */
+
+/* ─── Messages and markdown content ───────────────────────────────────────── */
+.msg-row { width: 100%; max-width: var(--content-w); margin: 0 auto; padding: 18px 24px 4px; position: relative; animation: fadeUp .22s ease both; }
+.msg-row:first-child { padding-top: 28px; }
+.msg-meta { gap: 8px; margin-bottom: 7px; display: flex; align-items: center; }
+.msg-avatar { width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center; font-size: .7rem; }
+.msg-avatar.user-av { background: var(--surface3); color: var(--text2); }
+.msg-avatar.ai-av { background: var(--accent-dim); color: var(--accent); }
+.msg-avatar svg { width: 11px; height: 11px; }
+.msg-role-label { color: var(--text3); font-size: .65rem; letter-spacing: .6px; text-transform: uppercase; font-family: var(--font-mono); }
+.msg-time { margin-left: auto; color: var(--text3); font-size: .6rem; font-family: var(--font-mono); }
+.msg-footer { gap: 3px; margin-top: 6px; opacity: 0; display: flex; align-items: center; }
+.msg-row:hover .msg-footer { opacity: 1; }
+.msg-action-btn { gap: 3px; padding: 3px 5px; border: none; border-radius: 4px; color: var(--text3); font-size: .62rem; background: none; }
+.msg-action-btn:hover { background: var(--surface3); color: var(--text2); }
+.msg-action-btn svg { width: 10px; height: 10px; }
+.msg-content { color: var(--text); font-size: .9rem; font-weight: 300; line-height: 1.75; }
+.msg-content p { margin-bottom: .65em; }
+.msg-content p:last-child { margin-bottom: 0; }
+.msg-content :is(h1, h2, h3, h4) { margin: 1.1em 0 .4em; color: var(--text); font-family: var(--font-tiempos); font-weight: 400; }
+.msg-content h1 { font-size: 1.4rem; }
+.msg-content h2 { font-size: 1.2rem; }
+.msg-content h3 { font-size: .9rem; }
+.msg-content :is(ul, ol) { margin-bottom: .65em; padding-left: 1.4em; }
+.msg-content li { margin-bottom: .25em; }
+.msg-content blockquote { margin: .6em 0; padding-left: 1em; border-left: 2px solid var(--accent); color: var(--text2); font-style: italic; }
+.msg-content table { margin: .8em 0; border-collapse: collapse; font-size: .85rem; }
+.msg-content :is(th, td) { padding: 7px 13px; border: 1px solid var(--border); }
+.msg-content th { background: var(--surface3); color: var(--text2); }
+.msg-content code:not(pre code) { padding: 1px 5px; border: 1px solid var(--border2); border-radius: 4px; background: var(--surface3); color: var(--accent); font-family: var(--font-mono); font-size: .83em; }
+.msg-content pre { margin: .7em 0; overflow: auto; position: relative; border: 1px solid var(--border); border-radius: 8px; background: var(--code-bg) !important; }
+.msg-content pre code { display: block; padding: 12px; font-family: var(--font-mono); font-size: .8rem; line-height: 1.6; }
+.code-copy {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  background: var(--surface3);
+  color: var(--text3);
+  opacity: 0;
+}
+.code-copy svg { width: 12px; height: 12px; }
+.msg-content pre:hover .code-copy { opacity: 1; }
+.code-copy:hover { color: var(--text); background: var(--surface2); }
+.inline-error { color: var(--red); }
+
+.msg-content a,
+.assistant-file-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--accent-border-dim);
+  transition: color var(--fast), text-decoration-color var(--fast);
+}
+.msg-content a:hover,
+.assistant-file-link:hover {
+  color: var(--text);
+  text-decoration-color: var(--border2);
+}
+
+.msg-images, .msg-edit-images { display: flex; flex-wrap: wrap; gap: 8px; }
+.msg-images { margin-top: 8px; }
+.msg-image { max-width: 280px; max-height: 280px; border: 1px solid var(--border); border-radius: var(--radius); object-fit: contain; cursor: zoom-in; transition: opacity var(--fast); }
+.msg-image:hover { opacity: .88; }
+
+.msg-attachments-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+  margin-bottom: 10px;
+}
+/* Keep attachments aligned with message text. User messages are text-left, so
+   their attachment cards should start from the same left edge instead of
+   floating to the far right. */
+.msg-attachments-grid { justify-content: flex-start; }
+.user-row .msg-attachments-grid { justify-content: flex-start; }
+.msg-attachment-card {
+  position: relative;
+  width: min(112px, calc(50vw - 44px));
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)), var(--surface2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03), 0 8px 24px rgba(0,0,0,.08);
+}
+.msg-image-card {
+  padding: 0;
+  aspect-ratio: 1 / 1;
+  cursor: zoom-in;
+}
+.msg-attachment-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform var(--fast), opacity var(--fast);
+}
+.msg-image-card:hover .msg-attachment-image { transform: scale(1.02); opacity: .94; }
+.msg-file-card {
+  min-height: 0;
+  padding: 10px;
+  display: flex;
+}
+.msg-file-card-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.msg-file-card-name {
+  color: var(--text);
+  font-size: .78rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.msg-file-card-subtle { color: var(--text2); font-size: .66rem; line-height: 1.25; }
+.msg-file-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+.msg-file-card-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  background: rgba(255,255,255,.035);
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  line-height: 1;
+  letter-spacing: .05em;
+}
+.msg-file-card-size { color: var(--text3); font-size: .62rem; font-family: var(--font-mono); }
+

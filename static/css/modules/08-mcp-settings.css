@@ -1,0 +1,56 @@
+/* MCP server settings groups, toggles, and icon picker styles. */
+
+/* ─── MCP server groups and toggles ───────────────────────────────────────── */
+#mcp-status { margin-top: -6px; margin-bottom: 10px; }
+#tool-list { display: flex; flex-direction: column; gap: 6px; }
+#tool-list .server-group:last-child { margin-bottom: 0; }
+.server-group { margin-bottom: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface2); transition: opacity .2s; }
+.server-group.server-disabled { opacity: .5; }
+.server-group.server-disabled .server-tools { display: none; }
+.server-group-header { justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 13px; border-bottom: 1px solid var(--border); background: var(--surface3); display: flex; align-items: center; }
+.server-group-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; font-family: var(--font-mono); color: var(--accent); font-weight: 500; }
+.server-group-controls { gap: 14px; display: flex; align-items: center; }
+.mcp-toggle-label { gap: 6px; cursor: pointer; user-select: none; display: flex; align-items: center; }
+.mcp-toggle-text { color: var(--text3); font-size: .7rem; white-space: nowrap; font-family: var(--font-mono); }
+.mcp-toggle { position: relative; width: 34px; height: 19px; display: inline-flex; align-items: center; padding: 0; border: none; appearance: none; -webkit-appearance: none; border-radius: 10px; outline: 1px solid var(--border); background: var(--surface3); cursor: pointer; transition: background .2s, outline-color .2s; }
+.mcp-toggle:hover { outline-color: var(--accent); }
+.mcp-toggle.mcp-toggle-on { background: var(--accent); outline-color: transparent; }
+.mcp-toggle-thumb { position: absolute; left: 3px; width: 13px; height: 13px; border-radius: 50%; background: var(--text3); pointer-events: none; transition: left .2s, background .2s; }
+.mcp-toggle.mcp-toggle-on .mcp-toggle-thumb { left: 18px; background: var(--bg); }
+.server-tools { padding: 8px 10px 4px; }
+.server-group .tool-card { margin-bottom: 5px; border-color: var(--border); background: var(--bg); }
+.server-group .tool-card:last-child { margin-bottom: 4px; }
+
+/* ─── Per-server icon picker ──────────────────────────────────────────────── */
+.server-icon-wrap { position: relative; flex-shrink: 0; order: 0; margin-right: 8px; }
+.server-group-name { order: 1; }
+.server-group-controls { order: 2; margin-left: auto; }
+.server-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface2); color: var(--text2);
+  cursor: pointer; transition: border-color .15s, background .15s, color .15s;
+}
+.server-icon-btn:hover { border-color: var(--accent); background: var(--surface3); color: var(--accent); }
+.server-icon-btn .server-icon-current { display: inline-flex; pointer-events: none; }
+.server-icon-btn svg { width: 14px; height: 14px; }
+
+.icon-picker-dropdown {
+  position: absolute; top: calc(100% + 5px); left: 0; z-index: 120;
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 6px; width: max-content; max-width: 180px;
+  background: var(--surface3); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.35);
+}
+.icon-option {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--text2);
+  cursor: pointer; transition: border-color .12s, background .12s, color .12s;
+}
+.icon-option svg { width: 15px; height: 15px; pointer-events: none; }
+.icon-option:hover { background: var(--surface2); color: var(--text); border-color: var(--border); }
+.icon-option.selected { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-border); }
+

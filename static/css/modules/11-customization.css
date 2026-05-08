@@ -1,0 +1,132 @@
+/* Customization tab cards, toggles, swatches, and visibility preference classes. */
+
+/* ─── Customization Tab ───────────────────────────────────────────────────── */
+
+/* Suppress all transitions during initial paint — removed after first rAF */
+html.no-transition *, html.no-transition *::before, html.no-transition *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Sidebar pre-collapsed before JS loads — mirrors #sidebar.collapsed exactly */
+html.sidebar-init-closed #sidebar {
+  transform: translateX(calc(-1 * var(--sidebar-w)));
+  position: fixed;
+}
+html.sidebar-init-closed #main {
+  margin-left: 0;
+}
+
+/* Base font size variable (set by JS) */
+
+/* Hide timestamps when toggled off */
+html.hide-timestamps .msg-time { display: none; }
+
+/* Hide suggestion chips when toggled off */
+html.hide-suggestion-chips #suggestions-bar { display: none !important; }
+
+/* ── Toggle switch ── */
+.cust-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cust-toggle input { display: none; }
+
+.cust-toggle-track {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  transition: background var(--fast), border-color var(--fast);
+}
+
+.cust-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  background: var(--text3);
+  border-radius: 50%;
+  transition: transform var(--fast), background var(--fast);
+}
+
+.cust-toggle input:checked + .cust-toggle-track {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+}
+
+.cust-toggle input:checked + .cust-toggle-track .cust-toggle-thumb {
+  transform: translateX(18px);
+  background: var(--accent);
+}
+
+/* ── Row layout ── */
+.cust-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.cust-row:last-of-type { border-bottom: none; }
+
+.cust-row-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cust-label { font-size: .82rem; color: var(--text); }
+.cust-hint  { font-size: .72rem; color: var(--text3); }
+
+/* ── Colour swatches ── */
+.cust-swatches {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+
+.cust-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sw);
+  border: 2px solid transparent;
+  outline: 2px solid transparent;
+  cursor: pointer;
+  transition: transform var(--fast), outline-color var(--fast), border-color var(--fast);
+}
+
+.cust-swatch:hover { transform: scale(1.15); }
+
+.cust-swatch.active {
+  border-color: var(--bg);
+  outline-color: var(--sw);
+  transform: scale(1.15);
+}
+
+/* ── Select input ── */
+.field select {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-roman);
+  font-size: .84rem;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a978f' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+.field select:focus { border-color: var(--accent-border); outline: none; }
+
+

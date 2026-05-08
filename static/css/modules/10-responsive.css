@@ -1,0 +1,51 @@
+/* General responsive behavior for the app shell and composer. */
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+#sidebar-backdrop { display: none; position: fixed; inset: 0; z-index: 99; background: rgba(0,0,0,.55); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); opacity: 0; transition: opacity .28s; }
+#sidebar-backdrop.visible { display: block; opacity: 1; }
+
+@media (max-width: 768px) {
+  :root { --sidebar-w: 280px; }
+  #sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; height: var(--vvh, 100dvh); transform: translateX(calc(-1 * var(--sidebar-w))); transition: transform .28s var(--ease); }
+  #sidebar:not(.collapsed) { transform: translateX(0); box-shadow: 8px 0 40px rgba(0,0,0,.6); }
+  #sidebar.collapsed { position: fixed; transform: translateX(calc(-1 * var(--sidebar-w))); }
+  #main { margin-left: 0 !important; }
+  #chat-header { height: calc(50px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 12px 0; gap: 8px; }
+  #chat-title-input { font-size: .82rem; }
+  #input-area { bottom: env(safe-area-inset-bottom, 12px); width: calc(100% - 24px); }
+  #main.is-empty #input-area { transform: translateX(-50%) translateY(-50%); }
+  .msg-row { padding: 12px 14px 4px; }
+  .msg-row:first-child { padding-top: 18px; }
+  .msg-content { font-size: .875rem; }
+  .composer-attachment-card, .msg-attachment-card { width: min(104px, calc(50vw - 28px)); min-height: 0; border-radius: 14px; }
+  .msg-file-card { min-height: 0; padding: 9px; }
+  .msg-file-card-name { font-size: .74rem; }
+  .msg-file-card-subtle { font-size: .62rem; }
+  .msg-content table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .msg-content pre { max-width: 100%; }
+  .msg-content pre code { font-size: .75rem; }
+  #empty-state { padding-bottom: 280px; }
+  .input-hint { display: none; }
+  .conv-item { padding: 10px 8px; }
+  .conv-del { opacity: 1; padding: 6px; }
+  .sidebar-action { padding: 11px 10px; }
+  #btn-toggle-sidebar { padding: 8px; }
+  #btn-toggle-sidebar svg { width: 20px; height: 20px; }
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal { width: 100%; max-width: 100%; height: 90dvh; max-height: 90dvh; border-bottom: none; border-radius: 16px 16px 0 0; transform: translateY(20px) scale(1); }
+  .modal-overlay.open .modal { transform: translateY(0) scale(1); }
+  .modal-header { padding: 14px 16px 12px; }
+  .modal-body { padding: 16px; }
+  .modal-footer { padding: 12px 16px; }
+  .field :is(input, select, textarea) { padding: 11px 12px; font-size: 0.94rem; }
+  .btn-primary, .btn-secondary { padding: 10px 18px; }
+  #model-badge-label { max-width: 100px; }
+  .suggestion-chip { font-size: .65rem; padding: 6px 11px; }
+}
+
+@media (max-width: 380px) {
+  .msg-row { padding: 10px 10px 4px; }
+  #chat-header { height: calc(46px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 10px 0; gap: 6px; }
+  #model-badge-label { max-width: 70px; }
+}
+
