@@ -749,6 +749,7 @@ svg { flex-shrink: 0; }
 .msg-content code:not(pre code) { padding: 1px 5px; border: 1px solid var(--border2); border-radius: 4px; background: var(--surface3); color: var(--accent); font-family: var(--font-mono); font-size: .83em; }
 .msg-content pre { margin: .7em 0; overflow: auto; position: relative; border: 1px solid var(--border); border-radius: 8px; background: var(--code-bg) !important; }
 .msg-content pre code { font-family: var(--font-mono); font-size: .8rem; line-height: 1.6; }
+html.wrap-code-lines .msg-content pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
 .code-copy { position: absolute; top: 8px; right: 8px; padding: 3px 9px; border: 1px solid var(--border2); border-radius: 5px; background: var(--surface3); color: var(--text3); font-family: var(--font-mono); font-size: .63rem; opacity: 0; }
 .msg-content pre:hover .code-copy { opacity: 1; }
 .code-copy:hover { color: var(--text); background: var(--surface2); }

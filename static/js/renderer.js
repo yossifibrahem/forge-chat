@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
 export function scrollToBottom(force = false) {
   const el = messagesEl();
   if (!el || (!force && !stickToBottom)) return;
+  if (!force && state.isStreaming && !state.autoScrollStreaming) return;
 
   requestAnimationFrame(() => {
     if (force || stickToBottom) {

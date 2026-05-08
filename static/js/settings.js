@@ -7,9 +7,10 @@ import { showStatus, showToast } from './ui.js';
 
 // ── Read / write ──────────────────────────────────────────────────────────────
 
+const SETTINGS_KEYS = Object.keys(SETTINGS_DEFAULTS);
+
 export function loadSettings() {
-  const saved = storage.get(STORAGE_KEYS.settings, {});
-  Object.assign(state, SETTINGS_DEFAULTS, saved);
+  Object.assign(state, SETTINGS_DEFAULTS, _savedSettings());
 
   const cachedModels = storage.get(STORAGE_KEYS.models);
   if (cachedModels) renderModelList(cachedModels);
@@ -17,23 +18,12 @@ export function loadSettings() {
   _syncAPIUI();
   _syncChatUI();
   updateModelBadge();
+  updateInputHint();
 }
 
 export function saveSettings() {
   _readAPIControls();
-  storage.set(STORAGE_KEYS.settings, {
-    apiBase:        state.apiBase,
-    apiKey:         state.apiKey,
-    model:          state.model,
-    systemPrompt:   state.systemPrompt,
-    temperature:    state.temperature,
-    maxTokens:      state.maxTokens,
-    requestTimeout: state.requestTimeout,
-    autoGenerateTitles: state.autoGenerateTitles,
-    streamResponses:    state.streamResponses,
-    enterToSend:        state.enterToSend,
-    contextMessages:    state.contextMessages,
-  });
+  _persistSettings();
   updateModelBadge();
   showStatus('settings-status', 'Settings saved ✓', 'ok');
   showToast('Settings saved');
@@ -41,20 +31,24 @@ export function saveSettings() {
 
 export function saveChatSettings() {
   _readChatControls();
-  storage.set(STORAGE_KEYS.settings, {
-    apiBase:        state.apiBase,
-    apiKey:         state.apiKey,
-    model:          state.model,
-    systemPrompt:   state.systemPrompt,
-    temperature:    state.temperature,
-    maxTokens:      state.maxTokens,
-    requestTimeout: state.requestTimeout,
-    autoGenerateTitles: state.autoGenerateTitles,
-    streamResponses:    state.streamResponses,
-    enterToSend:        state.enterToSend,
-    contextMessages:    state.contextMessages,
-  });
+  _persistSettings();
+  updateInputHint();
   showToast('Chat settings saved');
+}
+
+export function updateInputHint() {
+  const hint = document.querySelector('.input-hint');
+  if (!hint) return;
+  hint.textContent = state.enterToSend ? '⏎ send · ⇧⏎ newline' : '⏎ newline · ⇧⏎ send';
+}
+
+function _savedSettings() {
+  const saved = storage.get(STORAGE_KEYS.settings, {});
+  return Object.fromEntries(SETTINGS_KEYS.map(key => [key, saved[key]]).filter(([, v]) => v !== undefined));
+}
+
+function _persistSettings() {
+  storage.set(STORAGE_KEYS.settings, Object.fromEntries(SETTINGS_KEYS.map(key => [key, state[key]])));
 }
 
 // ── Model list ────────────────────────────────────────────────────────────────
@@ -127,19 +121,9 @@ export function initKeyToggle() {
 export function initParameterSliders() {
   const tempSlider  = document.getElementById('setting-temperature');
   const tempBadge   = document.getElementById('temp-badge');
-  const ctxSlider   = document.getElementById('setting-context');
-  const ctxBadge    = document.getElementById('context-badge');
-
   if (tempSlider && tempBadge) {
     tempSlider.addEventListener('input', () => {
       tempBadge.textContent = parseFloat(tempSlider.value).toFixed(2);
-    });
-  }
-
-  if (ctxSlider && ctxBadge) {
-    ctxSlider.addEventListener('input', () => {
-      const v = parseInt(ctxSlider.value, 10);
-      ctxBadge.textContent = v === 0 ? 'All' : `Last ${v}`;
     });
   }
 }
@@ -167,14 +151,9 @@ function _syncChatUI() {
   const el = id => document.getElementById(id);
   el('system-prompt').value = state.systemPrompt;
 
-  _setCheckbox('setting-auto-titles', state.autoGenerateTitles);
-  _setCheckbox('setting-stream',      state.streamResponses);
-  _setCheckbox('setting-enter-send',  state.enterToSend);
-
-  const ctx = el('setting-context');
-  if (ctx) ctx.value = state.contextMessages || 0;
-  const ctxBadge = el('context-badge');
-  if (ctxBadge) ctxBadge.textContent = state.contextMessages ? `Last ${state.contextMessages}` : 'All';
+  _setCheckbox('setting-auto-titles',     state.autoGenerateTitles);
+  _setCheckbox('setting-enter-send',      state.enterToSend);
+  _setCheckbox('setting-auto-scroll',     state.autoScrollStreaming);
 }
 
 function _readAPIControls() {
@@ -194,9 +173,8 @@ function _readAPIControls() {
 function _readChatControls() {
   state.systemPrompt        = document.getElementById('system-prompt')?.value.trim()          ?? state.systemPrompt;
   state.autoGenerateTitles  = document.getElementById('setting-auto-titles')?.checked          ?? state.autoGenerateTitles;
-  state.streamResponses     = document.getElementById('setting-stream')?.checked               ?? state.streamResponses;
   state.enterToSend         = document.getElementById('setting-enter-send')?.checked           ?? state.enterToSend;
-  state.contextMessages     = parseInt(document.getElementById('setting-context')?.value, 10)  || 0;
+  state.autoScrollStreaming = document.getElementById('setting-auto-scroll')?.checked          ?? state.autoScrollStreaming;
 }
 
 function _setCheckbox(id, value) {

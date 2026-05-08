@@ -74,6 +74,7 @@
 
     // Char count
     if (prefs.showCharCount === false) r.classList.add('hide-char-count');
+    if (prefs.wrapCodeLines === true) r.classList.add('wrap-code-lines');
 
     // Suppress all transitions during initial paint so nothing animates in
     r.classList.add('no-transition');
@@ -294,12 +295,12 @@
 
           <div class="field-row">
             <div class="field">
-              <label>Max Tokens</label>
+              <label>Response limit</label>
               <input type="number" id="setting-max-tokens" placeholder="Provider default" min="0" max="128000" step="256" />
-              <div class="field-note">0 = provider default.</div>
+              <div class="field-note">Maximum output tokens. 0 = provider default.</div>
             </div>
             <div class="field">
-              <label>Timeout (s)</label>
+              <label>Request timeout (s)</label>
               <input type="number" id="setting-timeout" placeholder="120" min="10" max="600" step="10" />
             </div>
           </div>
@@ -334,21 +335,11 @@
             </label>
           </div>
 
-          <div class="cust-row">
-            <div class="cust-row-label">
-              <span class="cust-label">Stream responses</span>
-              <span class="cust-hint">Show tokens as they arrive instead of waiting for the full reply</span>
-            </div>
-            <label class="cust-toggle">
-              <input type="checkbox" id="setting-stream" />
-              <span class="cust-toggle-track"><span class="cust-toggle-thumb"></span></span>
-            </label>
-          </div>
 
           <div class="cust-row">
             <div class="cust-row-label">
               <span class="cust-label">Enter sends message</span>
-              <span class="cust-hint">Press Enter to send&nbsp;&mdash;&nbsp;Shift+Enter for a new line</span>
+              <span class="cust-hint">On: Enter sends, Shift+Enter adds a new line. Off: Enter adds a new line, Shift+Enter sends.</span>
             </div>
             <label class="cust-toggle">
               <input type="checkbox" id="setting-enter-send" />
@@ -356,11 +347,15 @@
             </label>
           </div>
 
-          <div class="field" style="margin-top:16px">
-            <label>Context window <span class="param-badge" id="context-badge">All</span></label>
-            <input type="range" id="setting-context" min="0" max="50" step="1" value="0" class="range-slider" />
-            <div class="range-labels"><span>All messages</span><span>Last 50</span></div>
-            <div class="field-note">Limit how many recent messages are sent to the model. 0 = send everything.</div>
+          <div class="cust-row">
+            <div class="cust-row-label">
+              <span class="cust-label">Auto-scroll while responding</span>
+              <span class="cust-hint">Follow new tokens only while you are already near the bottom</span>
+            </div>
+            <label class="cust-toggle">
+              <input type="checkbox" id="setting-auto-scroll" />
+              <span class="cust-toggle-track"><span class="cust-toggle-thumb"></span></span>
+            </label>
           </div>
         </div>
 
@@ -518,6 +513,17 @@
             </div>
             <label class="cust-toggle">
               <input type="checkbox" id="cust-char-count" />
+              <span class="cust-toggle-track"><span class="cust-toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="cust-row">
+            <div class="cust-row-label">
+              <span class="cust-label">Wrap long code lines</span>
+              <span class="cust-hint">Soft-wrap code blocks instead of scrolling horizontally</span>
+            </div>
+            <label class="cust-toggle">
+              <input type="checkbox" id="cust-wrap-code-lines" />
               <span class="cust-toggle-track"><span class="cust-toggle-thumb"></span></span>
             </label>
           </div>

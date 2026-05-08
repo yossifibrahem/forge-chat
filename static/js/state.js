@@ -10,9 +10,8 @@ export const SETTINGS_DEFAULTS = {
   requestTimeout:     120,  // seconds
   // Chat behaviour
   autoGenerateTitles: true,
-  streamResponses:    true,
   enterToSend:        true,
-  contextMessages:    0,    // 0 = all
+  autoScrollStreaming:true,
 };
 
 export const CUSTOMIZATION_DEFAULTS = {
@@ -22,8 +21,9 @@ export const CUSTOMIZATION_DEFAULTS = {
   blocksDefaultExpanded:  false,
   groupSequentialBlocks:  false,
   showCharCount:          true,
+  wrapCodeLines:          false,
   fontSize:              'medium',    // 'small' | 'medium' | 'large'
-  fontFamily:            'sora',      // 'sora' | 'mono' | 'system'
+  fontFamily:            'sora',      // 'sora' | 'tiempos' | 'mono' | 'system'
   theme:                 'dark',      // 'dark' | 'light' | 'auto'
   accentColor:           '#c9a96e',   // preset swatch
   customAccentColor:     '',          // user custom hex

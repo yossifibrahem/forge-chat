@@ -146,7 +146,9 @@ function bindInputEvents() {
   document.getElementById('send-btn').addEventListener('click', submitInput);
   userInput.addEventListener('input',   () => { autoResize(userInput); updateCharCount(); updateSendButton(); });
   userInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitInput(); }
+    if (e.key !== 'Enter') return;
+    const wantsSend = state.enterToSend ? !e.shiftKey : e.shiftKey;
+    if (wantsSend) { e.preventDefault(); submitInput(); }
   });
 
   document.getElementById('stop-btn').addEventListener('click', stopAssistantTurn);

@@ -36,6 +36,9 @@ export function applyCustomization() {
 
   // Char count
   document.documentElement.classList.toggle('hide-char-count', !state.showCharCount);
+
+  // Code blocks
+  document.documentElement.classList.toggle('wrap-code-lines', !!state.wrapCodeLines);
 }
 
 function _applyTheme(theme) {
@@ -95,6 +98,7 @@ export function saveCustomization() {
     blocksDefaultExpanded: state.blocksDefaultExpanded,
     groupSequentialBlocks: state.groupSequentialBlocks,
     showCharCount:         state.showCharCount,
+    wrapCodeLines:         state.wrapCodeLines,
     fontSize:              state.fontSize,
     fontFamily:            state.fontFamily,
     theme:                 state.theme,
@@ -171,6 +175,7 @@ export function syncCustomizationUI() {
   _setCheckbox('cust-blocks-expanded',   state.blocksDefaultExpanded);
   _setCheckbox('cust-group-seq-blocks',  state.groupSequentialBlocks);
   _setCheckbox('cust-char-count',        state.showCharCount);
+  _setCheckbox('cust-wrap-code-lines',   state.wrapCodeLines);
 
   const fs = document.getElementById('cust-font-size');
   if (fs) fs.value = state.fontSize;
@@ -205,6 +210,7 @@ function _readControlsIntoState() {
   state.blocksDefaultExpanded = document.getElementById('cust-blocks-expanded')?.checked   ?? state.blocksDefaultExpanded;
   state.groupSequentialBlocks = document.getElementById('cust-group-seq-blocks')?.checked  ?? state.groupSequentialBlocks;
   state.showCharCount         = document.getElementById('cust-char-count')?.checked        ?? state.showCharCount;
+  state.wrapCodeLines         = document.getElementById('cust-wrap-code-lines')?.checked   ?? state.wrapCodeLines;
   state.fontSize              = document.getElementById('cust-font-size')?.value           ?? state.fontSize;
   state.fontFamily            = document.getElementById('cust-font-family')?.value         ?? state.fontFamily;
 

@@ -261,11 +261,7 @@ async function buildApiMessages(turnMessages) {
   const systemParts = [state.systemPrompt, buildMcpPrompt({ tools: state.mcpTools, isServerEnabled })].filter(Boolean);
   if (systemParts.length) messages.push({ role: 'system', content: systemParts.join('\n\n') });
 
-  // Apply the context-window limit: 0 means send the full history.
-  const contextWindow = state.contextMessages || 0;
-  const sliced = contextWindow > 0 ? turnMessages.slice(-contextWindow) : turnMessages;
-
-  messages.push(...sliced.map(prepareMessageForApi));
+  messages.push(...turnMessages.map(prepareMessageForApi));
   return expandImageRefs(messages);
 }
 

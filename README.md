@@ -23,7 +23,7 @@ Conversations are persisted locally on your filesystem. Each conversation gets i
 - **Thinking steps** — Extended reasoning / chain-of-thought blocks are displayed in a collapsible "thinking" panel.
 - **Auto-generated titles** — After the first exchange, a separate lightweight model call names the conversation in 2–5 words.
 - **Image uploads** — Paste or attach images; they are stored by content hash and sent as vision inputs.
-- **Customisable UI** — Accent colour, font size, sidebar default state, timestamps, and suggestion chips are all user-configurable and persisted in `localStorage`.
+- **Customisable UI** — Accent colour, theme, font size, sidebar default state, timestamps, character count, and suggestion chips are user-configurable and persisted in `localStorage`.
 - **Conversation search** — Filter the sidebar conversation list in real time.
 
 ---
