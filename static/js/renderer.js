@@ -5,11 +5,11 @@ import { applyMarkdown } from './markdown.js';
 import { $, createElement, remove, setVisible } from './dom.js';
 import { ICONS } from './icons.js';
 import { state } from './state.js';
-import { formatBytes, fileExtensionLabel } from './format.js';
+import { escapeHtml, formatBytes, fileExtensionLabel } from './format.js';
 import {
-  escapeHtml, getToolDisplayLabel, getToolMetaText, formatArgsHtml, renderToolResultHtml, visibleToolArgs,
+  getToolDisplayLabel, getToolMetaText, formatArgsHtml, renderToolResultHtml, visibleToolArgs,
 } from './mcp_tool_ui.js';
-export { escapeHtml, getToolDisplayLabel } from './mcp_tool_ui.js';
+export { getToolDisplayLabel } from './mcp_tool_ui.js';
 
 function getToolIconSvg(toolName) {
   const tool = state.mcpTools.find(t => t.name === toolName);
@@ -122,49 +122,48 @@ function prepareAssistantRow() {
   return row;
 }
 
-function addUserFooter(row, getText, logIndex, getContent = () => null) {
-  const footer = createElement('div', { className: 'msg-footer' });
+function createMessageAction(icon, label, onClick) {
+  const btn = createElement('button', { className: 'msg-action-btn', html: `${icon} ${label}` });
+  btn.addEventListener('click', onClick);
+  return btn;
+}
 
-  const copyBtn = createElement('button', { className: 'msg-action-btn', html: `${ICONS.copy} copy` });
-  copyBtn.addEventListener('click', () => {
+function createCopyAction(getText) {
+  const btn = createMessageAction(ICONS.copy, 'copy', () => {
     navigator.clipboard.writeText(getText());
-    copyBtn.textContent = '✓ copied';
-    setTimeout(() => { copyBtn.innerHTML = `${ICONS.copy} copy`; }, 1500);
+    btn.textContent = '✓ copied';
+    setTimeout(() => { btn.innerHTML = `${ICONS.copy} copy`; }, 1500);
   });
+  return btn;
+}
 
-  const editBtn = createElement('button', { className: 'msg-action-btn', html: `${ICONS.edit} edit` });
-  editBtn.addEventListener('click', () => {
-    if (logIndex < 0) return;
-    startInlineEdit(row, logIndex, getText(), getContent());
-  });
-
-  footer.appendChild(copyBtn);
-  footer.appendChild(editBtn);
+function addMessageFooter(row, actions = []) {
+  row.querySelector('.msg-footer')?.remove();
+  const footer = createElement('div', { className: 'msg-footer' });
+  actions.forEach(action => footer.appendChild(action));
   row.appendChild(footer);
 }
 
-function addAssistantFooter(row, getText, logIndex) {
-  const footer = createElement('div', { className: 'msg-footer' });
+function addUserFooter(row, getText, logIndex, getContent = () => null) {
+  addMessageFooter(row, [
+    createCopyAction(getText),
+    createMessageAction(ICONS.edit, 'edit', () => {
+      if (logIndex < 0) return;
+      startInlineEdit(row, logIndex, getText(), getContent());
+    }),
+  ]);
+}
 
-  const copyBtn = createElement('button', { className: 'msg-action-btn', html: `${ICONS.copy} copy` });
-  copyBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(getText());
-    copyBtn.textContent = '✓ copied';
-    setTimeout(() => { copyBtn.innerHTML = `${ICONS.copy} copy`; }, 1500);
-  });
+function addAssistantFooter(row, getText, logIndex) {
+  const actions = [createCopyAction(getText)];
 
   if (logIndex >= 0) {
-    const regenBtn = createElement('button', { className: 'msg-action-btn', html: `${ICONS.refresh} regenerate` });
-    regenBtn.addEventListener('click', () => {
+    actions.push(createMessageAction(ICONS.refresh, 'regenerate', () => {
       row.dispatchEvent(new CustomEvent('chat:regenerate', { bubbles: true, detail: { logIndex } }));
-    });
-    footer.appendChild(copyBtn);
-    footer.appendChild(regenBtn);
-  } else {
-    footer.appendChild(copyBtn);
+    }));
   }
 
-  row.appendChild(footer);
+  addMessageFooter(row, actions);
 }
 
 function startInlineEdit(row, logIndex, currentText, currentContent = null) {
@@ -524,7 +523,7 @@ function renderAttachmentCard(attachment, { edit = false } = {}) {
       <div class="msg-file-card-name"></div>
       <div class="msg-file-card-subtle">Available in chat workspace</div>
       <div class="msg-file-card-meta">
-        <span class="msg-file-card-badge">${badge}</span>
+        <span class="msg-file-card-badge">${escapeHtml(badge)}</span>
         ${size ? `<span class="msg-file-card-size">${size}</span>` : ''}
       </div>
     </div>`;
@@ -654,13 +653,12 @@ function createToolResultBody(toolName, args, result) {
   return sections.join('');
 }
 
-// appendToolResult is used by renderAllMessages for history replay
-function appendToolResultInline(toolName, args, result, displayName = '') {
+function applyToolResultStrip(strip, toolName, args, result, displayName = '') {
   const expanded = state.blocksDefaultExpanded;
   // Adapter system takes priority; fall back to stored displayName for old history entries.
   const label = getToolDisplayLabel(toolName, args) || displayName;
-  const row = prepareAssistantRow();
-  const strip = createElement('div', { className: `tool-strip tool-strip-result tool-inline${expanded ? ' open' : ''}` });
+
+  strip.className = `tool-strip tool-strip-result tool-inline${expanded ? ' open' : ''}`;
   strip.innerHTML = `
     <button class="tr-summary">
       <span class="tr-chevron">${expanded ? ICONS.chevronDown : ICONS.chevronRight}</span>
@@ -668,18 +666,30 @@ function appendToolResultInline(toolName, args, result, displayName = '') {
       <span class="tr-tool-name">${escapeHtml(label)}</span>
     </button>
     <div class="tr-body" style="${expanded ? '' : 'display:none'}">${createToolResultBody(toolName, args, result)}</div>`;
+
   attachCollapsible(strip, {
     headerSelector:  '.tr-summary',
     bodySelector:    '.tr-body',
     chevronSelector: '.tr-chevron',
   });
-  row.appendChild(strip);
-  // Eagerly group with adjacent blocks (history replay path).
+}
+
+function regroupToolStrip(strip) {
   if (strip.closest('.block-group')) {
     updateGroupLabel(strip.closest('.block-group'));
   } else if (state.groupSequentialBlocks) {
     tryGroupBlock(strip);
   }
+}
+
+// appendToolResult is used by renderAllMessages for history replay
+function appendToolResultInline(toolName, args, result, displayName = '') {
+  const row = prepareAssistantRow();
+  const strip = createElement('div');
+  applyToolResultStrip(strip, toolName, args, result, displayName);
+  row.appendChild(strip);
+  // Eagerly group with adjacent blocks (history replay path).
+  regroupToolStrip(strip);
   scrollToBottom();
 }
 
@@ -827,32 +837,8 @@ export function toolStripSetRunning(strip, args = {}) {
 }
 export function toolStripFinalize(strip, toolName, args, result, displayName = '') {
   restorePoppedApproval(strip);
-  const expanded = state.blocksDefaultExpanded;
-  // Always derive the label through the adapter system (tool_adapters/index.js).
-  // Each adapter declares a `labelArg` so the right argument is picked automatically.
-  // `displayName` is kept as a last-resort fallback only for legacy stored history
-  // entries that predate the adapter system.
-  const label = getToolDisplayLabel(toolName, args) || displayName;
-  strip.className = `tool-strip tool-strip-result tool-inline${expanded ? ' open' : ''}`;
-  strip.innerHTML = `
-    <button class="tr-summary">
-      <span class="tr-chevron">${expanded ? ICONS.chevronDown : ICONS.chevronRight}</span>
-      <span class="tool-icon">${getToolIconSvg(toolName)}</span>
-      <span class="tr-tool-name">${escapeHtml(label)}</span>
-    </button>
-    <div class="tr-body" style="${expanded ? '' : 'display:none'}">${createToolResultBody(toolName, args, result)}</div>`;
-
-  attachCollapsible(strip, {
-    headerSelector:  '.tr-summary',
-    bodySelector:    '.tr-body',
-    chevronSelector: '.tr-chevron',
-  });
-
-  if (strip.closest('.block-group')) {
-    updateGroupLabel(strip.closest('.block-group'));
-  } else if (state.groupSequentialBlocks) {
-    tryGroupBlock(strip);
-  }
+  applyToolResultStrip(strip, toolName, args, result, displayName);
+  regroupToolStrip(strip);
   scrollToBottom();
 }
 

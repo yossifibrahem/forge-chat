@@ -29,15 +29,17 @@
     var r = document.documentElement;
 
     // Accent color
-    var hex = prefs.accentColor;
+    var hex = prefs.customAccentColor || prefs.accentColor;
     if (hex && /^#[0-9a-f]{6}$/i.test(hex)) {
       var m = /^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
       var rgb = parseInt(m[1],16)+','+parseInt(m[2],16)+','+parseInt(m[3],16);
       r.style.setProperty('--accent',            hex);
       r.style.setProperty('--accent-dim',        'rgba('+rgb+',0.12)');
+      r.style.setProperty('--accent-hover',      'rgba('+rgb+',0.20)');
       r.style.setProperty('--accent-glow',       'rgba('+rgb+',0.06)');
       r.style.setProperty('--accent-border',     'rgba('+rgb+',0.4)');
       r.style.setProperty('--accent-border-dim', 'rgba('+rgb+',0.25)');
+      r.style.setProperty('--accent-border-mid', 'rgba('+rgb+',0.50)');
     }
 
     // Font size
@@ -63,6 +65,8 @@
     var theme = prefs.theme || 'auto';
     if (theme === 'auto') {
       theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    } else {
+      theme = theme === 'light' ? 'light' : 'dark';
     }
     r.setAttribute('data-theme', theme);
 

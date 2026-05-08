@@ -3,9 +3,10 @@
 import { api }         from './api.js';
 import { state, STORAGE_KEYS } from './state.js';
 import { storage } from './storage.js';
-import { clearMessages, renderAllMessages, escapeHtml } from './renderer.js';
+import { clearMessages, renderAllMessages } from './renderer.js';
 import { toggleSidebar } from './ui.js';
 import { ICONS } from './icons.js';
+import { escapeHtml } from './format.js';
 import { refreshFilePanel, resetFilePanel } from './file_panel.js';
 
 // ── Sidebar list ──────────────────────────────────────────────────────────────
@@ -164,6 +165,7 @@ export function startNewChat() {
   clearMessages();
   resetFilePanel();
   refreshFilePanel();
+  document.dispatchEvent(new CustomEvent('chat:conversation-opened', { detail: { convId: null, data: {} } }));
   document.querySelectorAll('.conv-item.active').forEach(el => el.classList.remove('active'));
   if (window.innerWidth <= 768) toggleSidebar(false);
 }

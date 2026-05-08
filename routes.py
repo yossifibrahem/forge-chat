@@ -134,7 +134,10 @@ def get_mcp_config():
 
 @blueprint.route("/api/mcp/config", methods=["POST"])
 def save_mcp_config():
-    mcp_service.save_config(_body())
+    try:
+        mcp_service.save_config(_body())
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     return jsonify({"ok": True})
 
 

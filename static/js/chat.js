@@ -6,7 +6,7 @@ import { ICONS } from './icons.js';
 import {
   createStreamingMessage, appendMessage,
   cancelAllToolApprovals, finalizeStreamingMessage, setStreamingMessageLogIndex,
-  escapeHtml, scrollToBottom, renderAllMessages,
+  scrollToBottom, renderAllMessages,
   createThinkingBlock, updateThinkingBlock, finalizeThinkingBlock,
   createToolStrip, toolStripFinalize, toolStripSetApproval, toolStripSetRunning,
 } from './renderer.js';
@@ -15,7 +15,7 @@ import { isServerEnabled, isServerAutoApprove } from './mcp.js';
 import { buildMcpSystemPrompt as buildMcpPrompt } from './mcp_policy.js';
 import { persistConversationFor, createNewConversation } from './conversations.js';
 import { refreshFilePanel } from './file_panel.js';
-import { formatBytes, fileExtensionLabel } from './format.js';
+import { escapeHtml, formatBytes, fileExtensionLabel } from './format.js';
 
 let turnAbortController = null;
 let turnCancelled = false;
@@ -31,10 +31,25 @@ let pendingAttachmentAdds = Promise.resolve();
 
 function getImagePreviewBar() { return document.getElementById('image-preview-bar'); }
 
+export function hasPendingAttachments() {
+  return pendingAttachments.length > 0;
+}
+
+function notifyAttachmentsChanged() {
+  document.dispatchEvent(new CustomEvent('chat:attachments-changed', {
+    detail: { hasAttachments: hasPendingAttachments() },
+  }));
+}
+
 function refreshImagePreviewBar() {
   const bar = getImagePreviewBar();
   if (!bar) return;
-  if (!pendingAttachments.length) { bar.hidden = true; bar.innerHTML = ''; return; }
+  if (!pendingAttachments.length) {
+    bar.hidden = true;
+    bar.innerHTML = '';
+    notifyAttachmentsChanged();
+    return;
+  }
   bar.hidden = false;
   bar.innerHTML = '';
 
@@ -78,6 +93,7 @@ function refreshImagePreviewBar() {
     });
     bar.appendChild(wrap);
   });
+  notifyAttachmentsChanged();
 }
 
 /** Read a File into a base64 data-URL, returning { dataUrl, mediaType, name }. */
@@ -306,6 +322,7 @@ function createStreamContext(turn) {
     turn,
     toolStartNames:     [],
     toolStrips:         [],
+    toolApprovalIndex:  0,
     toolRunningIndex:   0,
     toolResultIndex:    0,
     assistantDone:      false,
@@ -430,7 +447,10 @@ document.addEventListener('chat:conversation-opened', async event => {
     }
     return;
   }
-  reattachActiveTurn(convId);
+  if (!reattachActiveTurn(convId)) {
+    state.streamId = null;
+    setStreaming(false);
+  }
 });
 
 function currentTitle() {
@@ -656,6 +676,15 @@ export async function sendMessage(userText) {
 
 // ── SSE helpers ───────────────────────────────────────────────────────────────
 
+function stripForToolEvent(ctx, evt, cursorKey) {
+  const stripIndex = ctx[cursorKey] || 0;
+  let strip = ctx.toolStrips[stripIndex];
+  if (!strip && ctx.isVisible()) strip = createToolStrip(evt.name);
+  if (strip && !ctx.toolStrips[stripIndex]) ctx.toolStrips[stripIndex] = strip;
+  ctx[cursorKey] = stripIndex + 1;
+  return strip;
+}
+
 /** Parses a single SSE event and mutates the streaming context. Returns false on terminal error. */
 async function processSSEEvent(raw, ctx) {
   const evt = JSON.parse(raw);
@@ -688,9 +717,9 @@ async function processSSEEvent(raw, ctx) {
 
   } else if (evt.type === 'tool_approval_required') {
     // Server is paused waiting for the user to approve or deny this tool call.
-    const stripIndex = ctx.toolStartNames.indexOf(evt.name);
-    let strip = stripIndex >= 0 ? ctx.toolStrips[stripIndex] : null;
-    if (!strip && ctx.isVisible()) strip = createToolStrip(evt.name);
+    // Use a cursor, not indexOf(name), so repeated calls to the same tool update
+    // the matching strip instead of always reusing the first one.
+    const strip = stripForToolEvent(ctx, evt, 'toolApprovalIndex');
 
     let approved = false;
     if (strip) {
@@ -707,11 +736,8 @@ async function processSSEEvent(raw, ctx) {
     }).catch(() => {});
 
   } else if (evt.type === 'tool_running') {
-    const stripIndex = ctx.toolRunningIndex || 0;
-    let strip = ctx.toolStrips[stripIndex];
-    if (!strip && ctx.isVisible()) strip = createToolStrip(evt.name);
+    const strip = stripForToolEvent(ctx, evt, 'toolRunningIndex');
     if (strip) toolStripSetRunning(strip, evt.args || {});
-    ctx.toolRunningIndex = stripIndex + 1;
 
   } else if (evt.type === 'tool_result') {
     if (ctx.reasoningBodyEl) {
@@ -723,9 +749,7 @@ async function processSSEEvent(raw, ctx) {
       ctx.contentEl = null;
     }
 
-    const stripIndex = ctx.toolResultIndex || 0;
-    let strip = ctx.toolStrips[stripIndex];
-    if (!strip && ctx.isVisible()) strip = createToolStrip(evt.name);
+    const strip = stripForToolEvent(ctx, evt, 'toolResultIndex');
     // Pass no displayName — renderer.js derives the label via getToolDisplayLabel()
     // which consults the tool_adapters/ system (each adapter declares its own labelArg).
     if (strip) toolStripFinalize(strip, evt.name, evt.args || {}, evt.result || '');

@@ -4,9 +4,8 @@ import { api } from './api.js';
 import { state } from './state.js';
 import { ICONS } from './icons.js';
 import { applyMarkdown } from './markdown.js';
-import { escapeHtml } from './renderer.js';
 import { showToast } from './ui.js';
-import { formatBytes, fileExtension as ext } from './format.js';
+import { escapeHtml, formatBytes, fileExtension as ext } from './format.js';
 
 const PANEL_WIDTH_KEY = 'lumen_file_panel_width';
 const MIN_PANEL_WIDTH = 280;

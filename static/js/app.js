@@ -10,7 +10,7 @@ import { openModal, closeModal, toggleSidebar, autoResize, updateCharCount, init
 import { loadSettings, saveSettings, saveChatSettings, fetchModels, initKeyToggle, initParameterSliders } from './settings.js';
 import { loadConversationList, openConversation, renameConversationTitle, startNewChat } from './conversations.js';
 import { loadMcpConfig, saveMcpConfig, reloadTools, loadCachedTools } from './mcp.js';
-import { sendMessage, stopAssistantTurn, editAndResend, regenerateFrom, initImageAttachments } from './chat.js';
+import { sendMessage, stopAssistantTurn, editAndResend, regenerateFrom, initImageAttachments, hasPendingAttachments } from './chat.js';
 import { initVoiceInput } from './voice.js';
 import { clearMessages } from './renderer.js';
 import { ICONS, initIcons } from './icons.js';
@@ -130,12 +130,12 @@ function bindInputEvents() {
 
   const updateSendButton = () => {
     if (!sendBtn) return;
-    sendBtn.disabled = userInput.value.trim() === '';
+    sendBtn.disabled = userInput.value.trim() === '' && !hasPendingAttachments();
   };
 
   const submitInput = () => {
     const text = userInput.value.trim();
-    if (!text) return; // don't submit empty messages
+    if (!text && !hasPendingAttachments()) return; // don't submit empty messages unless files/images are attached
     userInput.value = '';
     autoResize(userInput);
     updateCharCount();
@@ -145,6 +145,7 @@ function bindInputEvents() {
 
   document.getElementById('send-btn').addEventListener('click', submitInput);
   userInput.addEventListener('input',   () => { autoResize(userInput); updateCharCount(); updateSendButton(); });
+  document.addEventListener('chat:attachments-changed', updateSendButton);
   userInput.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
     const wantsSend = state.enterToSend ? !e.shiftKey : e.shiftKey;
@@ -161,15 +162,6 @@ function bindInputEvents() {
   titleInput.addEventListener('change', renameConversationTitle);
   titleInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
 
-  // Empty-state prompt clicks (event delegation)
-  document.getElementById('messages').addEventListener('click', e => {
-    const prompt = e.target.closest('.es-prompt');
-    if (!prompt) return;
-    userInput.value = prompt.dataset.prompt;
-    autoResize(userInput);
-    userInput.focus();
-    updateSendButton();
-  });
 
   // Edit & Resend — dispatched from renderer when user confirms an edit
   document.getElementById('messages').addEventListener('chat:edit-resend', e => {

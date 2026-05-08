@@ -1,15 +1,11 @@
-"""
-MCP service layer — config persistence, tool discovery, tool invocation.
-
-The asyncio coroutines are executed safely from Flask's synchronous
-context via `run_async`, which always spins up a dedicated thread to
-avoid conflicts with any existing event loop.
-"""
+"""MCP service layer — config persistence, tool discovery, tool invocation."""
 from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -17,18 +13,32 @@ from typing import Any
 from mcp_adapters import apply_workspace_process_options, expand_config_env
 
 MCP_CONFIG_FILE = Path("mcp.json")
+log = logging.getLogger(__name__)
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
 def load_config() -> dict:
-    if MCP_CONFIG_FILE.exists():
-        return json.loads(MCP_CONFIG_FILE.read_text())
-    return {"mcpServers": {}}
+    if not MCP_CONFIG_FILE.exists():
+        return {"mcpServers": {}}
+    try:
+        config = json.loads(MCP_CONFIG_FILE.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        log.warning("[mcp] could not read %s: %s", MCP_CONFIG_FILE, exc)
+        return {"mcpServers": {}}
+    return config if isinstance(config, dict) and isinstance(config.get("mcpServers", {}), dict) else {"mcpServers": {}}
 
 
 def save_config(config: dict) -> None:
-    MCP_CONFIG_FILE.write_text(json.dumps(config, indent=2))
+    if not isinstance(config, dict):
+        raise ValueError("MCP config must be a JSON object")
+    config.setdefault("mcpServers", {})
+    if not isinstance(config["mcpServers"], dict):
+        raise ValueError("mcpServers must be a JSON object")
+
+    tmp_path = MCP_CONFIG_FILE.with_suffix(f".tmp-{uuid.uuid4().hex}")
+    tmp_path.write_text(json.dumps(config, indent=2))
+    tmp_path.replace(MCP_CONFIG_FILE)
 
 
 def find_server(server_name: str) -> dict | None:
@@ -92,7 +102,7 @@ async def fetch_tools(server_name: str, server_config: dict, conv_id: str = "") 
                         "inputSchema": getattr(tool, "inputSchema", {}),
                     })
     except Exception as exc:
-        print(f"[MCP] Failed to list tools from '{server_name}': {exc}")
+        log.warning("[mcp] failed to list tools from %r: %s", server_name, exc)
     return tools
 
 
@@ -119,6 +129,11 @@ async def invoke_tool(server_name: str, server_config: dict, tool_name: str, arg
 # ── Sync bridge ───────────────────────────────────────────────────────────────
 
 def run_async(coro) -> Any:
-    """Run an async coroutine from a synchronous Flask handler."""
+    """Run an async coroutine from sync code without spawning a thread unless one is needed."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
     with ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(asyncio.run, coro).result()

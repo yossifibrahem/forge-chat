@@ -3,9 +3,9 @@
 import { api }     from './api.js';
 import { state, STORAGE_KEYS } from './state.js';
 import { storage } from './storage.js';
-import { escapeHtml }   from './renderer.js';
 import { showToast } from './ui.js';
 import { ICONS, MCP_ICON_OPTIONS } from './icons.js';
+import { escapeHtml } from './format.js';
 
 // ── Server settings helpers ───────────────────────────────────────────────────
 
@@ -39,18 +39,26 @@ export function isServerAutoApprove(serverName) {
 
 export async function loadMcpConfig() {
   const cfg = await api.get('/api/mcp/config');
-  document.getElementById('mcp-config-editor').value = JSON.stringify(cfg, null, 2);
+  document.getElementById('mcp-config-editor').value = JSON.stringify(cfg.error ? { mcpServers: {} } : cfg, null, 2);
+  if (cfg.error) _setMcpStatus(`Could not load config: ${cfg.error}`, 'err');
 }
 
 export async function saveMcpConfig() {
+  let cfg;
   try {
-    const cfg = JSON.parse(document.getElementById('mcp-config-editor').value);
-    await api.post('/api/mcp/config', cfg);
-    _setMcpStatus('Config saved ✓', 'ok');
-    showToast('MCP config saved');
+    cfg = JSON.parse(document.getElementById('mcp-config-editor').value);
   } catch (err) {
     _setMcpStatus(`Invalid JSON: ${err.message}`, 'err');
+    return;
   }
+
+  const result = await api.post('/api/mcp/config', cfg);
+  if (result.error) {
+    _setMcpStatus(`Could not save config: ${result.error}`, 'err');
+    return;
+  }
+  _setMcpStatus('Config saved ✓', 'ok');
+  showToast('MCP config saved');
 }
 
 
@@ -235,10 +243,6 @@ function renderToolList() {
       const setting = getServerSetting(btn.dataset.server);
       setting.icon = btn.dataset.icon;
       saveServerSettings();
-      // Dispatch a custom event so renderer.js can update live tool strips
-      document.dispatchEvent(new CustomEvent('mcp:icon-changed', {
-        detail: { server: btn.dataset.server, iconKey: btn.dataset.icon },
-      }));
       renderToolList();
     });
   });

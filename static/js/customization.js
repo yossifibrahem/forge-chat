@@ -7,9 +7,11 @@ import { showToast } from './ui.js';
 // ── Apply ─────────────────────────────────────────────────────────────────────
 // Reads from `state` and pushes every setting into the live DOM.
 
+let autoThemeListenerAttached = false;
+
 export function applyCustomization() {
   // Theme (light/dark/auto)
-  _applyTheme(state.theme || 'dark');
+  _applyTheme(state.theme || CUSTOMIZATION_DEFAULTS.theme);
 
   // Font size
   const isMobile = window.innerWidth <= 768;
@@ -76,11 +78,13 @@ export function loadCustomization() {
   applyCustomization();
   syncCustomizationUI();
 
-  // If auto theme, re-apply when OS preference changes
-  if (state.theme === 'auto') {
+  // If auto theme, re-apply when OS preference changes. Attach once only;
+  // loadCustomization can be called again after reset/import-style flows.
+  if (!autoThemeListenerAttached) {
     window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
       if (state.theme === 'auto') _applyTheme('auto');
     });
+    autoThemeListenerAttached = true;
   }
 }
 
@@ -179,7 +183,7 @@ export function syncCustomizationUI() {
   if (ff) ff.value = state.fontFamily;
 
   // Theme radio
-  const themeRadio = document.querySelector(`input[name="cust-theme"][value="${state.theme || 'dark'}"]`);
+  const themeRadio = document.querySelector(`input[name="cust-theme"][value="${state.theme || CUSTOMIZATION_DEFAULTS.theme}"]`);
   if (themeRadio) themeRadio.checked = true;
 
   // Swatches

@@ -107,19 +107,16 @@ def list_dir(conv_id: str, path_value: str | None) -> tuple[dict, int]:
         return {"error": "Path is not a directory"}, 400
 
     root = workspace_root(conv_id)
-    entries = []
-    for child in sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
-        if len(entries) >= MAX_LIST_ENTRIES:
-            break
-        entries.append(_file_entry(child, root))
+    children = sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+    visible_children = children[:MAX_LIST_ENTRIES]
 
     return {
         "path": workspace_path(rel),
         "relative_path": rel,
         "parent": _parent_workspace_path(rel),
-        "entries": entries,
+        "entries": [_file_entry(child, root) for child in visible_children],
         "limit": MAX_LIST_ENTRIES,
-        "truncated": len(entries) >= MAX_LIST_ENTRIES,
+        "truncated": len(children) > MAX_LIST_ENTRIES,
     }, 200
 
 
@@ -194,11 +191,13 @@ def save_uploads(conv_id: str, files: Iterable) -> tuple[dict, int]:
                 if total > MAX_UPLOAD_BYTES:
                     fh.close()
                     target.unlink(missing_ok=True)
+                    for previous in saved:
+                        Path(previous["host_path"]).unlink(missing_ok=True)
                     return {"error": f"File '{filename}' exceeds the upload limit of {MAX_UPLOAD_BYTES} bytes"}, 413
                 fh.write(chunk)
 
         saved.append({
-            "name": filename,
+            "name": target.name,
             "size": total,
             "path": f"/workspace/uploads/{target.name}",
             "host_path": str(target),

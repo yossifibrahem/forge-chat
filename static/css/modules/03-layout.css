@@ -68,6 +68,4 @@
   font-size: .7rem;
   letter-spacing: .3px;
 }
-/* Suggestion chips in empty state are handled via #suggestions-bar */
-.es-prompts { display: none; }
 

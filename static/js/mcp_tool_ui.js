@@ -4,15 +4,10 @@
 // Per-tool overrides (meta text, arg filtering, result rendering) live in
 // tool_adapters/. Add or remove adapters by editing tool_adapters/index.js.
 
+import { escapeHtml } from './format.js';
 import { adapterFor } from './tool_adapters/index.js';
 
-export function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+export { escapeHtml } from './format.js';
 
 export function getToolDisplayLabel(toolName, args = {}) {
   const adapter = adapterFor(toolName);

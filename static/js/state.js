@@ -21,7 +21,7 @@ export const CUSTOMIZATION_DEFAULTS = {
   showCharCount:          true,
   fontSize:              'medium',    // 'small' | 'medium' | 'large'
   fontFamily:            'sora',      // 'sora' | 'tiempos' | 'mono' | 'system'
-  theme:                 'dark',      // 'dark' | 'light' | 'auto'
+  theme:                 'auto',      // 'dark' | 'light' | 'auto'
   accentColor:           '#c9a96e',   // preset swatch
   customAccentColor:     '',          // user custom hex
 };

@@ -23,3 +23,12 @@ export function fileExtensionLabel(name = '') {
 export function fileExtension(name = '') {
   return (name.split('.').pop() || '').toLowerCase();
 }
+
+
+export function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}

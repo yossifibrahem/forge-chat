@@ -7,6 +7,7 @@ routes call these functions and decide what HTTP status to return.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import json
 import re
@@ -23,17 +24,24 @@ IMAGES_DIR = Path.home() / ".lumen" / "images"
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 
+_SAFE_IMAGE_EXTENSIONS = {'png', 'jpeg', 'webp', 'gif'}
 _SAFE_NAME = re.compile(r'^[a-f0-9]{64}\.(png|jpeg|webp|gif)$')
 
 
 # ── Image storage ─────────────────────────────────────────────────────────────
 
 def save_image(data_b64: str, media_type: str) -> str:
-    """Decode base64 image, persist by SHA-256 hash, return filename."""
-    raw  = base64.b64decode(data_b64)
-    ext  = (media_type.split("/")[-1].split(";")[0] or "png").lower()
+    """Decode a supported image type, persist by SHA-256 hash, and return filename."""
+    ext = (media_type.split("/")[-1].split(";")[0] or "png").lower()
     if ext == "jpg":
         ext = "jpeg"
+    if ext not in _SAFE_IMAGE_EXTENSIONS:
+        raise ValueError(f"Unsupported image type: {media_type or 'unknown'}")
+    try:
+        raw = base64.b64decode(data_b64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("Invalid image data") from exc
+
     name = hashlib.sha256(raw).hexdigest() + "." + ext
     path = IMAGES_DIR / name
     if not path.exists():
@@ -82,13 +90,21 @@ def list_all() -> list[dict]:
 
 def load(conv_id: str) -> dict | None:
     path = _path(conv_id)
-    return json.loads(path.read_text()) if path.exists() else None
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
 
 
 def save(conv_id: str, data: dict) -> dict:
-    """Stamp updated_at, write to disk, and return the saved data."""
+    """Stamp updated_at, write atomically, and return the saved data."""
     data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    _path(conv_id).write_text(json.dumps(data, indent=2))
+    path = _path(conv_id)
+    tmp_path = path.with_suffix(f".tmp-{uuid.uuid4().hex}")
+    tmp_path.write_text(json.dumps(data, indent=2))
+    tmp_path.replace(path)
     return data
 
 
