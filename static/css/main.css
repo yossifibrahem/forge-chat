@@ -754,13 +754,18 @@ svg { flex-shrink: 0; }
 .code-copy:hover { color: var(--text); background: var(--surface2); }
 .inline-error { color: var(--red); }
 
+.msg-content a,
 .assistant-file-link {
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
+  text-decoration-color: var(--accent-border-dim);
+  transition: color var(--fast), text-decoration-color var(--fast);
 }
+.msg-content a:hover,
 .assistant-file-link:hover {
-  color: var(--accent-strong);
+  color: var(--text);
+  text-decoration-color: var(--border2);
 }
 
 .msg-images, .msg-edit-images { display: flex; flex-wrap: wrap; gap: 8px; }
