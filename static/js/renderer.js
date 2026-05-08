@@ -259,33 +259,29 @@ function isGroupableBlock(el) {
   );
 }
 
-function makeGroupSummary(elements) {
-  let thinks = 0, tools = 0;
-  elements.forEach(el => {
-    if (el.classList.contains('thinking-block')) thinks++;
-    else if (el.classList.contains('tool-strip')) tools++;
-  });
+// Single pass over groupable elements — returns both the header label (last block)
+// and the summary string (counts), avoiding two iterations for the same data.
+function getGroupMeta(elements) {
+  let thinks = 0, tools = 0, label = '';
+  for (const el of elements) {
+    if (el.classList.contains('thinking-block')) {
+      thinks++;
+      label = el.querySelector('.thinking-label')?.textContent?.trim() || 'Thinking';
+    } else if (el.classList.contains('tool-strip')) {
+      tools++;
+      label = el.querySelector('.tr-tool-name')?.textContent?.trim()
+            || el.dataset.displayName
+            || 'Tool';
+    }
+  }
   const parts = [];
   if (thinks) parts.push(`${thinks} thinking`);
-  if (tools) parts.push(`${tools} tool use`);
-  return parts.join(' + ');
-}
-
-function getLastBlockLabel(elements) {
-  const last = elements[elements.length - 1];
-  if (!last) return '';
-  if (last.classList.contains('thinking-block'))
-    return last.querySelector('.thinking-label')?.textContent?.trim() || 'Thinking';
-  if (last.classList.contains('tool-strip'))
-    return last.querySelector('.tr-tool-name')?.textContent?.trim()
-        || last.dataset.displayName
-        || 'Tool';
-  return '';
+  if (tools)  parts.push(`${tools} tool use`);
+  return { label, summary: parts.join(' + ') };
 }
 
 function createGroupBlock(elements) {
-  const summary = makeGroupSummary(elements);
-  const label   = getLastBlockLabel(elements);
+  const { label, summary } = getGroupMeta(elements);
   const expanded = state.blocksDefaultExpanded;
 
   const group = createElement('div', { className: `block-group${expanded ? ' open' : ''}` });
@@ -313,12 +309,14 @@ function createGroupBlock(elements) {
 }
 
 function updateGroupLabel(group) {
-  const body     = group?.querySelector('.group-body');
-  const elements = body ? [...body.children].filter(isGroupableBlock) : [];
-  const lbl = group?.querySelector('.group-label');
-  const dsc = group?.querySelector('.group-desc');
-  if (lbl) lbl.textContent = getLastBlockLabel(elements);
-  if (dsc) dsc.textContent = makeGroupSummary(elements);
+  const body = group?.querySelector('.group-body');
+  if (!body) return;
+  const elements = [...body.children].filter(isGroupableBlock);
+  const { label, summary } = getGroupMeta(elements);
+  const lbl = group.querySelector('.group-label');
+  const dsc = group.querySelector('.group-desc');
+  if (lbl) lbl.textContent = label;
+  if (dsc) dsc.textContent = summary;
 }
 
 function tryGroupBlock(el) {
@@ -634,12 +632,7 @@ function appendToolResultInline(toolName, args, result, displayName = '') {
     chevronSelector: '.tr-chevron',
   });
   row.appendChild(strip);
-  // Eagerly group with adjacent blocks (history replay path).
-  if (strip.closest('.block-group')) {
-    updateGroupLabel(strip.closest('.block-group'));
-  } else if (state.groupSequentialBlocks) {
-    tryGroupBlock(strip);
-  }
+  if (state.groupSequentialBlocks) tryGroupBlock(strip);
   scrollToBottom();
 }
 
@@ -806,11 +799,7 @@ export function toolStripFinalize(strip, toolName, args, result, displayName = '
     chevronSelector: '.tr-chevron',
   });
 
-  if (strip.closest('.block-group')) {
-    updateGroupLabel(strip.closest('.block-group'));
-  } else if (state.groupSequentialBlocks) {
-    tryGroupBlock(strip);
-  }
+  if (state.groupSequentialBlocks) tryGroupBlock(strip);
   scrollToBottom();
 }
 
