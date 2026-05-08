@@ -748,8 +748,22 @@ svg { flex-shrink: 0; }
 .msg-content th { background: var(--surface3); color: var(--text2); }
 .msg-content code:not(pre code) { padding: 1px 5px; border: 1px solid var(--border2); border-radius: 4px; background: var(--surface3); color: var(--accent); font-family: var(--font-mono); font-size: .83em; }
 .msg-content pre { margin: .7em 0; overflow: auto; position: relative; border: 1px solid var(--border); border-radius: 8px; background: var(--code-bg) !important; }
-.msg-content pre code { font-family: var(--font-mono); font-size: .8rem; line-height: 1.6; }
-.code-copy { position: absolute; top: 8px; right: 8px; padding: 3px 9px; border: 1px solid var(--border2); border-radius: 5px; background: var(--surface3); color: var(--text3); font-family: var(--font-mono); font-size: .63rem; opacity: 0; }
+.msg-content pre code { display: block; padding: 12px; font-family: var(--font-mono); font-size: .8rem; line-height: 1.6; }
+.code-copy {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  background: var(--surface3);
+  color: var(--text3);
+  opacity: 0;
+}
+.code-copy svg { width: 12px; height: 12px; }
 .msg-content pre:hover .code-copy { opacity: 1; }
 .code-copy:hover { color: var(--text); background: var(--surface2); }
 .inline-error { color: var(--red); }
@@ -1396,10 +1410,13 @@ body.file-panel-resizing { cursor: col-resize; user-select: none; }
 #file-preview-body {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
   padding: 10px;
 }
 .file-code-preview {
+  flex: 1;
   margin: 0;
   min-height: 100%;
   border: 1px solid var(--border);
@@ -1409,6 +1426,7 @@ body.file-panel-resizing { cursor: col-resize; user-select: none; }
 }
 .file-code-preview code {
   display: block;
+  min-height: 100%;
   padding: 12px;
   white-space: pre;
   color: var(--text2);
@@ -1417,6 +1435,7 @@ body.file-panel-resizing { cursor: col-resize; user-select: none; }
   line-height: 1.55;
 }
 .file-markdown-preview {
+  flex: 1;
   min-height: 100%;
   padding: 12px;
   border: 1px solid var(--border);
@@ -1717,6 +1736,47 @@ html.hide-suggestion-chips #suggestions-bar { display: none !important; }
   --code-bg: #f0eeea;
   --shadow:  0 8px 32px rgba(0,0,0,.12);
 }
+[data-theme="light"] .hljs { color: #24292f; background: transparent; }
+[data-theme="light"] .hljs-doctag,
+[data-theme="light"] .hljs-keyword,
+[data-theme="light"] .hljs-meta .hljs-keyword,
+[data-theme="light"] .hljs-template-tag,
+[data-theme="light"] .hljs-template-variable,
+[data-theme="light"] .hljs-type,
+[data-theme="light"] .hljs-variable.language_ { color: #cf222e; }
+[data-theme="light"] .hljs-title,
+[data-theme="light"] .hljs-title.class_,
+[data-theme="light"] .hljs-title.class_.inherited__,
+[data-theme="light"] .hljs-title.function_ { color: #8250df; }
+[data-theme="light"] .hljs-attr,
+[data-theme="light"] .hljs-attribute,
+[data-theme="light"] .hljs-literal,
+[data-theme="light"] .hljs-meta,
+[data-theme="light"] .hljs-number,
+[data-theme="light"] .hljs-operator,
+[data-theme="light"] .hljs-selector-attr,
+[data-theme="light"] .hljs-selector-class,
+[data-theme="light"] .hljs-selector-id,
+[data-theme="light"] .hljs-variable { color: #0550ae; }
+[data-theme="light"] .hljs-regexp,
+[data-theme="light"] .hljs-string,
+[data-theme="light"] .hljs-meta .hljs-string { color: #0a3069; }
+[data-theme="light"] .hljs-built_in,
+[data-theme="light"] .hljs-symbol { color: #953800; }
+[data-theme="light"] .hljs-comment,
+[data-theme="light"] .hljs-code,
+[data-theme="light"] .hljs-formula { color: #6e7781; }
+[data-theme="light"] .hljs-name,
+[data-theme="light"] .hljs-quote,
+[data-theme="light"] .hljs-selector-pseudo,
+[data-theme="light"] .hljs-selector-tag { color: #116329; }
+[data-theme="light"] .hljs-subst { color: #24292f; }
+[data-theme="light"] .hljs-section { color: #0550ae; font-weight: 700; }
+[data-theme="light"] .hljs-bullet { color: #735c0f; }
+[data-theme="light"] .hljs-emphasis { color: #24292f; font-style: italic; }
+[data-theme="light"] .hljs-strong { color: #24292f; font-weight: 700; }
+[data-theme="light"] .hljs-addition { color: #116329; background-color: #dafbe1; }
+[data-theme="light"] .hljs-deletion { color: #82071e; background-color: #ffebe9; }
 [data-theme="light"] .range-slider { background: #dddbd4; }
 [data-theme="light"] .range-slider::-webkit-slider-thumb { border-color: #fff; }
 

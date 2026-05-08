@@ -1,6 +1,7 @@
 // Markdown + LaTeX rendering.
 
 import { state } from './state.js';
+import { ICONS } from './icons.js';
 //
 // Strategy: before running marked, stash every LaTeX block in a side
 // array (replacing it with a sentinel).  After markdown is rendered,
@@ -117,11 +118,20 @@ export function applyMarkdown(el, text) {
     hljs.highlightElement(block);
     const btn = document.createElement('button');
     btn.className = 'code-copy';
-    btn.textContent = 'copy';
+    btn.type = 'button';
+    btn.innerHTML = ICONS.copy;
+    btn.title = 'Copy code';
+    btn.setAttribute('aria-label', 'Copy code');
     btn.onclick = () => {
       navigator.clipboard.writeText(block.innerText);
-      btn.textContent = 'copied!';
-      setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+      btn.innerHTML = ICONS.check;
+      btn.title = 'Copied';
+      btn.setAttribute('aria-label', 'Copied');
+      setTimeout(() => {
+        btn.innerHTML = ICONS.copy;
+        btn.title = 'Copy code';
+        btn.setAttribute('aria-label', 'Copy code');
+      }, 1500);
     };
     block.parentElement.appendChild(btn);
   });
