@@ -956,10 +956,12 @@ svg { flex-shrink: 0; }
 .status-msg.err { border: 1px solid rgba(224,112,112,.3); background: rgba(224,112,112,.1); color: var(--red); }
 .model-box { margin-top: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface2); overflow: hidden; }
 .model-box-header { min-height: 34px; padding: 0 7px 0 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; color: var(--text3); font-size: .66rem; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .45px; }
-.model-refresh-btn { width: 26px; height: 26px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text3); display: grid; place-items: center; cursor: pointer; }
+.model-refresh-btn { width: 26px; height: 26px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text3); display: grid; place-items: center; cursor: pointer; transition: border-color .15s, background .15s, color .15s, opacity .15s; }
 .model-refresh-btn:hover { border-color: var(--border2); color: var(--text); background: var(--surface3); }
 .model-refresh-btn:disabled { cursor: wait; opacity: .55; }
 .model-refresh-btn svg { width: 14px; height: 14px; }
+.model-refresh-btn.loading svg { animation: refresh-spin .8s linear infinite; }
+@keyframes refresh-spin { to { transform: rotate(360deg); } }
 .model-box .status-msg { margin: 6px 6px 0; }
 .model-list { flex-direction: column; gap: 2px; max-height: 220px; margin: 0; padding: 6px; border: 0; border-radius: 0; background: transparent; display: flex; overflow-y: auto; }
 .model-empty { padding: 12px 8px; color: var(--text3); font-size: .7rem; font-family: var(--font-mono); text-align: center; }
@@ -971,17 +973,21 @@ svg { flex-shrink: 0; }
 .model-chip:hover { border-color: var(--accent); color: var(--accent); }
 .section-sep { height: 1px; margin: 22px 0; background: var(--border); }
 .section-title { margin-bottom: 16px; color: var(--text); font-family: var(--font-tiempos); font-size: .95rem; }
+.section-title.with-action { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .tool-card { margin-bottom: 7px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface2); }
 .tool-card-header { gap: 8px; margin-bottom: 4px; display: flex; align-items: center; }
 .tool-card-name { font-size: .78rem; font-family: var(--font-mono); color: var(--accent); font-weight: 500; }
 .tool-card-desc { color: var(--text2); font-size: .78rem; line-height: 1.5; }
-.no-tools-label { color: var(--text3); font-size: .75rem; font-family: var(--font-mono); }
+.no-tools-label { padding: 14px 8px; color: var(--text3); font-size: .75rem; font-family: var(--font-mono); text-align: center; }
 #mcp-config-editor { min-height: 200px; padding: 12px; resize: vertical; tab-size: 2; background: var(--code-bg); color: var(--accent); font-size: .78rem; font-family: var(--font-mono); }
 #toast { position: fixed; bottom: 80px; left: 50%; z-index: 500; padding: 8px 16px; border: 1px solid var(--border2); border-radius: 8px; background: var(--surface3); box-shadow: var(--shadow); color: var(--text); font-family: var(--font-mono); font-size: .72rem; white-space: nowrap; opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(10px); transition: all .2s; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ─── MCP server groups and toggles ───────────────────────────────────────── */
-.server-group { margin-bottom: 10px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface2); transition: opacity .2s; }
+#mcp-status { margin-top: -6px; margin-bottom: 10px; }
+#tool-list { display: flex; flex-direction: column; gap: 6px; }
+#tool-list .server-group:last-child { margin-bottom: 0; }
+.server-group { margin-bottom: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface2); transition: opacity .2s; }
 .server-group.server-disabled { opacity: .5; }
 .server-group.server-disabled .server-tools { display: none; }
 .server-group-header { justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 13px; border-bottom: 1px solid var(--border); background: var(--surface3); display: flex; align-items: center; }

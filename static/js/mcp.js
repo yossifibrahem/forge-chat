@@ -4,7 +4,7 @@ import { api }     from './api.js';
 import { state, STORAGE_KEYS } from './state.js';
 import { storage } from './storage.js';
 import { escapeHtml }   from './renderer.js';
-import { showStatus, showToast } from './ui.js';
+import { showToast } from './ui.js';
 import { ICONS, MCP_ICON_OPTIONS } from './icons.js';
 
 // ── Server settings helpers ───────────────────────────────────────────────────
@@ -46,10 +46,10 @@ export async function saveMcpConfig() {
   try {
     const cfg = JSON.parse(document.getElementById('mcp-config-editor').value);
     await api.post('/api/mcp/config', cfg);
-    showStatus('mcp-status', 'Config saved ✓', 'ok');
+    _setMcpStatus('Config saved ✓', 'ok');
     showToast('MCP config saved');
   } catch (err) {
-    showStatus('mcp-status', `Invalid JSON: ${err.message}`, 'err');
+    _setMcpStatus(`Invalid JSON: ${err.message}`, 'err');
   }
 }
 
@@ -86,20 +86,43 @@ export function loadCachedTools() {
 }
 
 export async function reloadTools() {
-  showStatus('mcp-status', 'Loading tools…', 'ok');
+  const btn = document.getElementById('btn-reload-tools');
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.title = 'Loading tools…';
+    btn.setAttribute('aria-label', 'Loading tools');
+  }
+  _setMcpStatus('Loading tools…', 'ok');
+
   try {
     const payload = await api.get(toolsEndpoint());
     state.mcpTools = normalizeToolsResponse(payload);
     storage.set(STORAGE_KEYS.mcpTools, state.mcpTools);
     renderToolList();
-    showStatus('mcp-status', `${state.mcpTools.length} tool(s) loaded ✓`, 'ok');
+    _setMcpStatus(state.mcpTools.length ? `${state.mcpTools.length} tool(s) loaded ✓` : 'No tools loaded', state.mcpTools.length ? 'ok' : 'err');
     showToast(`${state.mcpTools.length} tool(s) loaded`);
   } catch (err) {
     state.mcpTools = [];
     storage.remove(STORAGE_KEYS.mcpTools);
     renderToolList();
-    showStatus('mcp-status', `Error loading tools: ${err.message}`, 'err');
+    _setMcpStatus(`Error loading tools: ${err.message}`, 'err');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.title = 'Reload tools';
+      btn.setAttribute('aria-label', 'Reload tools');
+    }
   }
+}
+
+function _setMcpStatus(message, type) {
+  const el = document.getElementById('mcp-status');
+  if (!el) return;
+  el.textContent = message;
+  el.className = `status-msg ${type}`;
+  el.style.display = 'block';
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
@@ -174,7 +197,7 @@ function renderToolList() {
   const container = document.getElementById('tool-list');
 
   if (!state.mcpTools.length) {
-    container.innerHTML = '<div class="no-tools-label">No tools loaded — click Reload Tools</div>';
+    container.innerHTML = '<div class="no-tools-label">No tools loaded</div>';
     return;
   }
 

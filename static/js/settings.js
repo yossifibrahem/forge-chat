@@ -58,7 +58,12 @@ let _modelFetchId = 0;
 export async function fetchModels() {
   const fetchId = ++_modelFetchId;
   const btn = document.getElementById('btn-fetch-models');
-  btn.disabled = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.title = 'Loading models…';
+    btn.setAttribute('aria-label', 'Loading models');
+  }
   _setModelStatus('Loading models…', 'Checking the API connection.', 'ok');
 
   try {
@@ -80,7 +85,12 @@ export async function fetchModels() {
   } catch (err) {
     if (fetchId === _modelFetchId) _setModelStatus('Could not load models', err.message, 'err');
   } finally {
-    if (fetchId === _modelFetchId) btn.disabled = false;
+    if (fetchId === _modelFetchId && btn) {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.title = 'Reload models';
+      btn.setAttribute('aria-label', 'Reload models');
+    }
   }
 }
 

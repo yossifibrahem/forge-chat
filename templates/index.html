@@ -517,19 +517,18 @@
             <label>mcp.json</label>
             <textarea id="mcp-config-editor" spellcheck="false"></textarea>
           </div>
-          <div class="btn-row mcp-actions-row">
-            <button class="btn-secondary" id="btn-reload-tools">
-              <span data-icon="syncIcon"></span>
-              Reload Tools
-            </button>
-          </div>
-          <div id="mcp-status" class="status-msg"></div>
         </div>
         <div class="section-sep"></div>
         <div class="settings-section">
-          <div class="section-title">Available Tools</div>
+          <div class="section-title with-action">
+            <span>Available Tools</span>
+            <button class="model-refresh-btn mcp-refresh-btn" id="btn-reload-tools" title="Reload tools" aria-label="Reload tools">
+              <span data-icon="syncIcon"></span>
+            </button>
+          </div>
+          <div id="mcp-status" class="status-msg"></div>
           <div id="tool-list">
-            <div class="no-tools-label">No tools loaded &mdash; click Reload Tools</div>
+            <div class="no-tools-label">No tools loaded</div>
           </div>
         </div>
       </div>
