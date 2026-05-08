@@ -1,5 +1,10 @@
 // MCP tool UI policy — display labels, argument filtering, and generic JSON result rendering.
 // Keep UI-specific MCP behavior here so renderer.js stays mostly orchestration/DOM code.
+//
+// Per-tool overrides (meta text, arg filtering, result rendering) live in
+// tool_adapters/. Add or remove adapters by editing tool_adapters/index.js.
+
+import { adapterFor } from './tool_adapters/index.js';
 
 export function escapeHtml(value) {
   return String(value)
@@ -15,10 +20,8 @@ export function getToolDisplayLabel(toolName, args = {}) {
 }
 
 export function getToolMetaText(toolName, args = {}) {
-  const pieces = [];
-  if (toolName === 'bash_tool' && args.command) pieces.push(args.command);
-  if ((toolName === 'view' || toolName === 'create_file' || toolName === 'str_replace') && args.path) pieces.push(args.path);
-  return pieces.join(' · ');
+  const adapter = adapterFor(toolName);
+  return adapter?.getMetaText?.(args) ?? '';
 }
 
 function normalizeBlockText(value) {
@@ -34,9 +37,31 @@ function formatToolValue(value) {
   return normalizeBlockText(value);
 }
 
-export function visibleToolArgs(args = {}) {
-  if (!args || typeof args !== 'object') return {};
-  return Object.fromEntries(Object.entries(args).filter(([key]) => key !== 'description'));
+export function visibleToolArgs(toolNameOrArgs, args) {
+  // Support legacy two-arg call (toolName, args) and original one-arg call (args).
+  let toolName, rawArgs;
+  if (typeof toolNameOrArgs === 'string') {
+    toolName = toolNameOrArgs;
+    rawArgs  = args ?? {};
+  } else {
+    toolName = null;
+    rawArgs  = toolNameOrArgs ?? {};
+  }
+
+  if (!rawArgs || typeof rawArgs !== 'object') return {};
+
+  // Strip the `description` sentinel that the model injects for the UI label.
+  const withoutDescription = Object.fromEntries(
+    Object.entries(rawArgs).filter(([key]) => key !== 'description')
+  );
+
+  // Delegate to the adapter's filterArgs if one is registered.
+  if (toolName) {
+    const adapter = adapterFor(toolName);
+    if (adapter?.filterArgs) return adapter.filterArgs(withoutDescription);
+  }
+
+  return withoutDescription;
 }
 
 export function formatArgsHtml(args = {}) {
@@ -74,7 +99,14 @@ function renderJsonResult(data) {
   return `<div class="tr-command-result">${blocks}</div>`;
 }
 
-export function renderToolResultHtml(result) {
+export function renderToolResultHtml(result, toolName = null, args = {}) {
+  // Let the registered adapter take first shot at rendering.
+  if (toolName) {
+    const adapter = adapterFor(toolName);
+    const custom = adapter?.renderResult?.(result, args);
+    if (custom != null) return custom;
+  }
+
   const data = parseToolJson(result);
   return data
     ? renderJsonResult(data)

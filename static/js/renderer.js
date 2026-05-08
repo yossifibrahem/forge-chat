@@ -584,7 +584,7 @@ export function setStreamingMessageLogIndex(contentEl, logIndex) {
 }
 
 function createToolResultBody(toolName, args, result) {
-  const displayArgs = visibleToolArgs(args);
+  const displayArgs = visibleToolArgs(toolName, args);
   const sections = [];
 
   if (Object.keys(displayArgs).length) {
@@ -598,7 +598,7 @@ function createToolResultBody(toolName, args, result) {
   sections.push(`
     <div class="tr-section">
       <div class="tr-section-label">Result</div>
-      ${renderToolResultHtml(result)}
+      ${renderToolResultHtml(result, toolName, args)}
     </div>`);
 
   return sections.join('');
