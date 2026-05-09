@@ -144,10 +144,10 @@
 }
 .conv-menu-wrap { position: relative; }
 .conv-menu-btn {
-  width: 25px;
-  height: 25px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   color: var(--text3);
   opacity: 0;
 }
@@ -159,7 +159,7 @@
   background: var(--surface2);
   color: var(--text2);
 }
-.conv-menu-btn svg { width: 13px; height: 13px; }
+.conv-menu-btn svg { width: 16px; height: 16px; }
 .conv-menu {
   position: absolute;
   right: 0;
