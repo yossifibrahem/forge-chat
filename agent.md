@@ -17,7 +17,7 @@ Lumen is a self-hosted Flask chat UI for OpenAI-compatible chat-completions APIs
 - Regular file uploads stored in the conversation workspace
 - Markdown, code highlighting, KaTeX, voice input, theming, and conversation search
 
-The app is intentionally lightweight: no database, no build step, no frontend framework, and no automated test suite currently included.
+The app is intentionally lightweight: no database, no build step, and no frontend framework. A backend pytest suite is included and should be kept focused on service/route behavior rather than broad brittle end-to-end tests.
 
 ## Repository map
 
@@ -33,8 +33,9 @@ The app is intentionally lightweight: no database, no build step, no frontend fr
 ├── workspace_service.py           # Workspace listing, reading, upload, download path safety
 ├── store.py                       # Filesystem persistence for conversations and images
 ├── Dockerfile.sandbox             # Required per-chat sandbox image
-├── requirements.txt               # Flask, CORS, OpenAI SDK, MCP SDK
+├── requirements.txt               # Flask, CORS, OpenAI SDK, MCP SDK, pytest tooling
 ├── README.md                      # User-facing project description and setup docs
+├── tests/                         # Backend pytest suite for services, routes, streaming, MCP, Docker startup
 ├── templates/index.html           # Full app shell and modal markup
 └── static/
     ├── css/                       # CSS entrypoint and module files
@@ -121,10 +122,13 @@ Note: both the README and the code use uppercase `LUMEN_*` env var names. Browse
 
 ### `app.py`
 
+- Validates Docker daemon availability before creating the Flask app.
+- Validates that the configured sandbox image exists before creating the Flask app.
 - Creates the Flask app with CORS enabled.
 - Registers the single blueprint from `routes.py`.
 - On startup, attempts to remove stale Docker containers whose conversation JSON no longer exists.
-- Docker cleanup is non-fatal; the app should still start when Docker is unavailable.
+- Docker and sandbox image checks are fatal because containers are a required runtime dependency.
+- Stale-container cleanup is non-fatal; cleanup failure should not prevent startup.
 
 ### `routes.py`
 
@@ -415,9 +419,61 @@ Follow the existing separation of concerns:
 - Remember that MCP servers always run in Docker; ensure the sandbox image is built and Docker is running before testing MCP behaviour.
 - Be cautious with module-level Python state if changing deployment assumptions; multi-worker servers will not share active streams/cancellation events.
 
+## Automated tests
+
+The repository now includes a backend pytest suite under `tests/`. Run it after backend changes:
+
+```bash
+pytest
+```
+
+For a quicker first pass while editing, run the module most related to the change, then run the full suite before packaging:
+
+```bash
+pytest tests/test_chat_turn_service.py
+pytest tests/test_routes_mcp_chat_stream.py
+pytest tests/test_mcp_service_async.py
+pytest
+```
+
+Current coverage focus:
+
+- `chat_turn_service.py`: streamed turn orchestration, tool approval/denial, auto-approved tool loops, persistence, cancellation, and title-generation branches.
+- `streaming.py`: OpenAI stream event conversion, reasoning/text chunks, tool-call deltas, cancellation, and provider errors.
+- `routes.py`: MCP tools/calls, chat stream start/reattach/cancel behavior, conversations, models, images, and workspace/file routes.
+- `mcp_service.py`: config helpers plus mocked async tool discovery/invocation paths and `run_async()`.
+- `mcp_adapters.py`: required conversation id path and container command/env rewriting.
+- `container_service.py`: Docker command construction, container lifecycle, status, stale cleanup, and workspace deletion.
+- `workspace_service.py` and `store.py`: path safety, upload/preview/download helpers, persistence, and image handling.
+- `app.py`: Docker-required startup checks, sandbox image checks, app factory order, and non-fatal stale cleanup.
+
+The tests are intentionally mock-heavy around Docker, OpenAI, and MCP SDK boundaries. Do not make tests require a real Docker daemon, real MCP server, or real API key unless you are adding a clearly separated integration test.
+
+Useful targeted test map:
+
+```text
+tests/test_app_startup.py              # app factory and required Docker/image checks
+tests/test_chat_turn_service.py        # persistent chat-turn orchestration
+tests/test_container_service.py        # Docker lifecycle command logic
+tests/test_mcp_adapters*.py            # MCP process/container launch adaptation
+tests/test_mcp_service*.py             # MCP config + async discovery/invocation
+tests/test_routes*.py                  # Flask route behavior and SSE stream state
+tests/test_streaming*.py               # stream_chat_completion generator/SSE events
+tests/test_store.py                    # filesystem conversation/image persistence
+tests/test_workspace_service.py        # workspace path/file safety
+```
+
+When adding tests:
+
+- Prefer small unit tests with monkeypatched boundaries.
+- Keep route tests thin and use Flask's test client.
+- Keep SSE tests deterministic by replacing threads/streams with sync fakes where practical.
+- Preserve existing JSON shapes in fixtures unless the application intentionally migrates them.
+- Add regression tests for streaming/order/persistence bugs before changing chat streaming code.
+
 ## Manual verification checklist
 
-There is no bundled test suite. At minimum, after edits, verify:
+Automated tests are useful, but still do a small manual pass after UI, Docker, or streaming changes. At minimum, verify:
 
 1. Python files compile:
 
@@ -449,11 +505,9 @@ There is no bundled test suite. At minimum, after edits, verify:
 
 Recommended future tests:
 
-- Flask route tests with `pytest` and Flask test client.
-- Unit tests for `workspace_service.workspace_relpath()` and `resolve_workspace_path()`.
-- Unit tests for `store.save_image()` and invalid image handling.
-- Unit tests for `mcp_adapters.apply_workspace_process_options()` and container launch parameter mutation.
-- Integration-ish tests for chat stream event ordering using mocked OpenAI streams.
+- Lightweight frontend tests for pure-ish JavaScript helpers (`markdown.js`, `format.js`, MCP adapter helpers, and renderer grouping helpers) if UI regressions continue.
+- A small browser/E2E smoke test only if the app starts needing stronger UI confidence.
+- Optional, clearly separated integration tests for real Docker/MCP behavior; keep them skipped by default so normal pytest stays fast and local-friendly.
 
 ## Known issues and things to inspect before feature work
 
@@ -525,7 +579,6 @@ grep -R "workspace\|/workspace\|file:/" -n *.py static/js
 
 - No database layer
 - No formal migration system
-- No bundled automated tests
 - No frontend package/build system
 - No authentication/user accounts
 - No shared backend state for multi-worker active stream reattach
