@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, render_template, request, send_file
 import chat_turn_service
 import container_service
 import mcp_service
+import mcp_adapters
 from mcp_adapters import ContainerConversationRequired
 import store
 import streaming as stream_module
@@ -143,15 +144,32 @@ def save_mcp_config():
 
 @blueprint.route("/api/mcp/tools", methods=["GET"])
 def list_mcp_tools():
-    conv_id = request.args.get("conv_id", "")
+    requested_conv_id = request.args.get("conv_id", "")
+    conv_id = requested_conv_id or container_service.DISCOVERY_CONTAINER_ID
     tools: list[dict] = []
     skipped: list[dict] = []
+    discovery_mode = not requested_conv_id
 
-    for name, cfg in mcp_service.load_config().get("mcpServers", {}).items():
-        try:
-            tools.extend(mcp_service.run_async(mcp_service.fetch_tools(name, cfg, conv_id=conv_id)))
-        except ContainerConversationRequired as exc:
-            skipped.append({"server": name, "reason": str(exc)})
+    configs = mcp_service.load_config().get("mcpServers", {})
+    if discovery_mode and configs:
+        all_volumes: list[str] = []
+        seen: set[str] = set()
+        for cfg in configs.values():
+            for volume in mcp_adapters.extract_host_mounts(cfg):
+                if volume not in seen:
+                    seen.add(volume)
+                    all_volumes.append(volume)
+        container_service.ensure_container(conv_id, extra_volumes=all_volumes)
+
+    try:
+        for name, cfg in configs.items():
+            try:
+                tools.extend(mcp_service.run_async(mcp_service.fetch_tools(name, cfg, conv_id=conv_id)))
+            except ContainerConversationRequired as exc:
+                skipped.append({"server": name, "reason": str(exc)})
+    finally:
+        if discovery_mode:
+            container_service.stop_container_process(conv_id)
 
     return jsonify({"tools": tools, "skipped": skipped} if skipped else tools)
 

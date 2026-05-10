@@ -21,6 +21,7 @@ CONTAINER_MEMORY = os.getenv("LUMEN_CONTAINER_MEMORY", "512m")
 CONTAINER_CPUS = os.getenv("LUMEN_CONTAINER_CPUS", "1")
 CONTAINER_NETWORK = os.getenv("LUMEN_CONTAINER_NETWORK", "bridge")
 CONTAINER_PREFIX = os.getenv("LUMEN_CONTAINER_PREFIX", "lumen-chat-")
+DISCOVERY_CONTAINER_ID = "__mcp_discovery__"
 
 ContainerStatus = Literal["running", "stopped", "missing"]
 
@@ -173,6 +174,18 @@ def _reuse_conflicting_container(conv_id: str, required_sources: set[str]) -> Co
     return ContainerInfo(conv_id, name, _workspace(conv_id), "running")
 
 
+def stop_container_process(conv_id: str) -> None:
+    """Stop a running container but keep it available for quick reuse."""
+    name = container_name(conv_id)
+    if get_status(conv_id) != "running":
+        return
+    result = _run(["docker", "stop", name])
+    if result.returncode != 0:
+        log.warning("[container] could not stop %s: %s", name, result.stderr.strip())
+    else:
+        log.info("[container] stopped %s", name)
+
+
 def stop_container(conv_id: str) -> None:
     name = container_name(conv_id)
     if get_status(conv_id) == "missing":
@@ -195,6 +208,7 @@ def cleanup_stale(known_ids: list[str]) -> list[str]:
         return []
 
     known_names = {container_name(cid) for cid in known_ids}
+    known_names.add(container_name(DISCOVERY_CONTAINER_ID))
     removed: list[str] = []
     for name in (line.strip() for line in result.stdout.splitlines()):
         if not name.startswith(CONTAINER_PREFIX) or name in known_names:

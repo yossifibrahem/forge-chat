@@ -66,10 +66,23 @@ export async function saveMcpConfig() {
 
 
 function normalizeToolsResponse(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (payload && Array.isArray(payload.tools)) return payload.tools;
+  if (Array.isArray(payload)) return { tools: payload, skipped: [] };
+  if (payload && Array.isArray(payload.tools)) {
+    return { tools: payload.tools, skipped: Array.isArray(payload.skipped) ? payload.skipped : [] };
+  }
   const message = payload?.error || 'Unexpected MCP tools response';
   throw new Error(message);
+}
+
+function toolsStatusMessage(tools, skipped) {
+  if (tools.length) {
+    const skippedText = skipped.length ? ` (${skipped.length} server(s) skipped)` : '';
+    return `${tools.length} tool(s) loaded ✓${skippedText}`;
+  }
+  if (skipped.length) {
+    return `No tools loaded — ${skipped.map(item => `${item.server}: ${item.reason}`).join('; ')}`;
+  }
+  return 'No tools loaded';
 }
 
 function toolsEndpoint() {
@@ -85,7 +98,7 @@ export function loadCachedTools() {
   if (!cached) return;
 
   try {
-    state.mcpTools = normalizeToolsResponse(cached);
+    state.mcpTools = normalizeToolsResponse(cached).tools;
     if (state.mcpTools.length) renderToolList();
   } catch {
     state.mcpTools = [];
@@ -105,10 +118,11 @@ export async function reloadTools() {
 
   try {
     const payload = await api.get(toolsEndpoint());
-    state.mcpTools = normalizeToolsResponse(payload);
+    const result = normalizeToolsResponse(payload);
+    state.mcpTools = result.tools;
     storage.set(STORAGE_KEYS.mcpTools, state.mcpTools);
     renderToolList();
-    _setMcpStatus(state.mcpTools.length ? `${state.mcpTools.length} tool(s) loaded ✓` : 'No tools loaded', state.mcpTools.length ? 'ok' : 'err');
+    _setMcpStatus(toolsStatusMessage(state.mcpTools, result.skipped), state.mcpTools.length ? 'ok' : 'err');
     showToast(`${state.mcpTools.length} tool(s) loaded`);
   } catch (err) {
     state.mcpTools = [];

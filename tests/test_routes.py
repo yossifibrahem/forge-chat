@@ -359,3 +359,144 @@ class TestIndexRoute:
         assert resp.status_code == 200
         # Must contain the top-level script tag that bootstraps the app
         assert b"app.js" in resp.data
+
+
+# ===========================================================================
+# MCP tools discovery
+# ===========================================================================
+
+class TestMcpToolsDiscoveryRoutes:
+
+    def test_no_conversation_uses_reusable_discovery_container(self, client, tmp_lumen):
+        config = {"mcpServers": {"fs": {"command": "npx", "args": []}}}
+
+        def fake_fetch(server_name, server_config, *, conv_id=""):
+            return {"server_name": server_name, "conv_id": conv_id}
+
+        def fake_run_async(payload):
+            return [{
+                "server": payload["server_name"],
+                "name": "list_files",
+                "description": "List files",
+                "inputSchema": {},
+            }]
+
+        with (
+            patch("mcp_service.load_config", return_value=config),
+            patch("mcp_adapters.extract_host_mounts", return_value=[]),
+            patch("container_service.ensure_container") as ensure_container,
+            patch("container_service.stop_container_process") as stop_container_process,
+            patch("mcp_service.fetch_tools", new=MagicMock(side_effect=fake_fetch)) as fetch_tools,
+            patch("mcp_service.run_async", side_effect=fake_run_async),
+        ):
+            resp = client.get("/api/mcp/tools")
+
+        assert resp.status_code == 200
+        assert resp.json == [{
+            "server": "fs",
+            "name": "list_files",
+            "description": "List files",
+            "inputSchema": {},
+        }]
+        ensure_container.assert_called_once_with(
+            "__mcp_discovery__",
+            extra_volumes=[],
+        )
+        fetch_tools.assert_called_once_with(
+            "fs",
+            config["mcpServers"]["fs"],
+            conv_id="__mcp_discovery__",
+        )
+        stop_container_process.assert_called_once_with("__mcp_discovery__")
+
+    def test_no_conversation_mounts_deduplicated_discovery_volumes(self, client, tmp_lumen):
+        config = {
+            "mcpServers": {
+                "a": {"command": "node", "args": ["/srv/a/server.js"]},
+                "b": {"command": "node", "args": ["/srv/b/server.js"]},
+            }
+        }
+
+        def fake_extract(cfg):
+            if cfg is config["mcpServers"]["a"]:
+                return [
+                    "/host/shared:/host/shared:ro",
+                    "/host/unique:/host/unique:ro",
+                ]
+            return ["/host/shared:/host/shared:ro"]
+
+        with (
+            patch("mcp_service.load_config", return_value=config),
+            patch("mcp_adapters.extract_host_mounts", side_effect=fake_extract),
+            patch("container_service.ensure_container") as ensure_container,
+            patch("container_service.stop_container_process"),
+            patch("mcp_service.fetch_tools", new=MagicMock(return_value=object())),
+            patch("mcp_service.run_async", return_value=[]),
+        ):
+            resp = client.get("/api/mcp/tools")
+
+        assert resp.status_code == 200
+        ensure_container.assert_called_once_with(
+            "__mcp_discovery__",
+            extra_volumes=[
+                "/host/shared:/host/shared:ro",
+                "/host/unique:/host/unique:ro",
+            ],
+        )
+
+    def test_existing_conversation_keeps_real_conversation_id(self, client, tmp_lumen):
+        config = {"mcpServers": {"bash": {"command": "bash", "args": []}}}
+
+        def fake_fetch(server_name, server_config, *, conv_id=""):
+            return {"server_name": server_name, "conv_id": conv_id}
+
+        def fake_run_async(payload):
+            return [{
+                "server": payload["server_name"],
+                "name": "run",
+                "description": "",
+                "inputSchema": {},
+            }]
+
+        with (
+            patch("mcp_service.load_config", return_value=config),
+            patch("container_service.ensure_container") as ensure_container,
+            patch("container_service.stop_container_process") as stop_container_process,
+            patch("mcp_service.fetch_tools", new=MagicMock(side_effect=fake_fetch)) as fetch_tools,
+            patch("mcp_service.run_async", side_effect=fake_run_async),
+        ):
+            resp = client.get("/api/mcp/tools", query_string={"conv_id": "chat-123"})
+
+        assert resp.status_code == 200
+        ensure_container.assert_not_called()
+        stop_container_process.assert_not_called()
+        fetch_tools.assert_called_once_with(
+            "bash",
+            config["mcpServers"]["bash"],
+            conv_id="chat-123",
+        )
+
+    def test_skipped_server_reason_is_preserved(self, client, tmp_lumen):
+        from mcp_adapters import ContainerConversationRequired
+
+        config = {"mcpServers": {"remote": {"command": "npx", "args": []}}}
+
+        with (
+            patch("mcp_service.load_config", return_value=config),
+            patch("mcp_adapters.extract_host_mounts", return_value=[]),
+            patch("container_service.ensure_container"),
+            patch("container_service.stop_container_process") as stop_container_process,
+            patch("mcp_service.fetch_tools", new=MagicMock(return_value=object())),
+            patch(
+                "mcp_service.run_async",
+                side_effect=ContainerConversationRequired("needs a conversation"),
+            ),
+        ):
+            resp = client.get("/api/mcp/tools")
+
+        assert resp.status_code == 200
+        assert resp.json == {
+            "tools": [],
+            "skipped": [{"server": "remote", "reason": "needs a conversation"}],
+        }
+        stop_container_process.assert_called_once_with("__mcp_discovery__")
