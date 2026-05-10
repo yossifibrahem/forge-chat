@@ -287,7 +287,10 @@ class McpSessionPool:
         future: Future = Future()
         with self._lock:
             self._jobs.put(("invoke", server_name, server_config, tool_name, arguments, future))
-            return future.result()
+        # Block *outside* the lock. Holding a lock while waiting on a future is a
+        # deadlock risk: any code path that needs self._lock while this call is
+        # in-flight (e.g. a concurrent close()) would be permanently blocked.
+        return future.result()
 
     async def _close_async(self) -> None:
         for entry in reversed(list(self._sessions.values())):

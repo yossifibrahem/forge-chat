@@ -296,3 +296,54 @@ class TestTurnRecorder:
             recorder.save([], force=True)
         _, title_arg, *_ = mock_save.call_args.args
         assert title_arg == "New Title"
+
+
+# ---------------------------------------------------------------------------
+# _bare_tool_name
+# ---------------------------------------------------------------------------
+
+class TestBareToolName:
+    """
+    Tool names are namespaced on the frontend as ``{server}_{tool}`` before
+    being sent to the model.  _bare_tool_name must reverse that namespace so
+    the backend can dispatch to the real tool name on the MCP server.
+
+    The tricky case is a server whose own name contains underscores (e.g.
+    ``my_search``): the namespaced form ``my_search_web_search`` must yield
+    ``web_search``, not ``search_web_search`` (the old split-on-first-underscore
+    bug).
+    """
+
+    def test_original_name_in_meta_takes_priority(self):
+        """originalName is the canonical path — always wins over any heuristic."""
+        meta = {"originalName": "web_search", "server": "search"}
+        assert svc._bare_tool_name("search_web_search", meta) == "web_search"
+
+    def test_server_with_underscores_stripped_exactly(self):
+        """
+        Regression: server name ``my_search`` must strip exactly 10 chars
+        (``my_search_``) so ``my_search_web_search`` → ``web_search``, not
+        ``search_web_search`` as the old split("_", 1) heuristic produced.
+        """
+        meta = {"server": "my_search"}
+        assert svc._bare_tool_name("my_search_web_search", meta) == "web_search"
+
+    def test_plain_server_name_no_underscores(self):
+        """Standard single-word server name still works via the server-prefix path."""
+        meta = {"server": "filesystem"}
+        assert svc._bare_tool_name("filesystem_read_file", meta) == "read_file"
+
+    def test_no_meta_falls_back_to_split_heuristic(self):
+        """When there is no meta at all the old heuristic is still the fallback."""
+        assert svc._bare_tool_name("server_tool") == "tool"
+
+    def test_no_meta_no_underscore_returns_name_unchanged(self):
+        assert svc._bare_tool_name("tool") == "tool"
+
+    def test_empty_meta_falls_back_to_split_heuristic(self):
+        assert svc._bare_tool_name("server_tool", {}) == "tool"
+
+    def test_original_name_preferred_over_server_key(self):
+        """Even when both originalName and server are present, originalName wins."""
+        meta = {"originalName": "correct_name", "server": "my_server"}
+        assert svc._bare_tool_name("my_server_correct_name", meta) == "correct_name"

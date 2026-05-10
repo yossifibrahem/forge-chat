@@ -179,9 +179,24 @@ def _tool_meta_by_name(body: dict) -> dict:
 
 
 def _bare_tool_name(name: str, meta: dict | None = None) -> str:
-    """Strip the server_ namespace prefix, using originalName from meta if available."""
+    """Strip the server_ namespace prefix, using originalName from meta if available.
+
+    Tool names are namespaced on the frontend as ``{server}_{tool}``
+    (see chat_payloads.js ``namespacedToolName``).  The ``originalName``
+    field in meta is the canonical source and is always preferred.
+
+    When originalName is absent the server name from meta is used to strip
+    exactly ``len(server) + 1`` characters from the front so that server
+    names that themselves contain underscores (e.g. ``my_search``) do not
+    mis-strip the tool name.  The last-resort heuristic (split on first ``_``)
+    is kept only for call-sites that have neither piece of metadata.
+    """
     if meta and meta.get("originalName"):
         return meta["originalName"]
+    if meta and meta.get("server"):
+        prefix = meta["server"] + "_"
+        if name.startswith(prefix):
+            return name[len(prefix):]
     if "_" in name:
         return name.split("_", 1)[1]
     return name

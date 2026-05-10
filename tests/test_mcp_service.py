@@ -303,3 +303,63 @@ class TestMcpSessionPool:
 
         with pytest.raises(RuntimeError, match="closed"):
             pool.invoke_tool("srv", {}, "tool", {})
+
+    def test_lock_not_held_while_waiting_for_result(self, monkeypatch):
+        """
+        Regression: invoke_tool() must release self._lock before blocking on
+        future.result().  If the lock were held across the wait, any code that
+        acquires self._lock while a call is in-flight (e.g. a concurrent
+        close()) would deadlock.
+
+        This test proves the lock is free during the wait by acquiring it from
+        a second thread while the pool is processing a (slightly delayed) tool
+        call.  Under the old code the second thread would hang forever; under
+        the fix it succeeds immediately.
+        """
+        import threading
+
+        created_stdio, created_sessions = self._install_fake_mcp(monkeypatch)
+
+        # Patch _build_server_params to return something the fake accepts.
+        delay_event = threading.Event()
+        original_invoke = mcp_service.McpSessionPool._invoke
+
+        async def slow_invoke(self_pool, server_name, server_config, tool_name, arguments):
+            # Briefly yield so the main thread has time to try acquiring the lock.
+            import asyncio
+            await asyncio.sleep(0.05)
+            return await original_invoke(self_pool, server_name, server_config, tool_name, arguments)
+
+        monkeypatch.setattr(mcp_service.McpSessionPool, "_invoke", slow_invoke)
+
+        pool = mcp_service.McpSessionPool(conv_id="conv-1")
+        pool.start()
+
+        lock_acquired_while_in_flight = threading.Event()
+        lock_acquire_error = []
+
+        def try_acquire_lock():
+            # Give invoke_tool() a moment to have submitted the job and be
+            # blocking on future.result().
+            import time
+            time.sleep(0.02)
+            acquired = pool._lock.acquire(timeout=1.0)
+            if acquired:
+                pool._lock.release()
+                lock_acquired_while_in_flight.set()
+            else:
+                lock_acquire_error.append("timed out acquiring lock — possible deadlock")
+
+        probe = threading.Thread(target=try_acquire_lock, daemon=True)
+        probe.start()
+
+        result = pool.invoke_tool("srv", {}, "tool", {"n": 1})
+        probe.join(timeout=2.0)
+        pool.close()
+
+        assert result == "tool:1"
+        assert not lock_acquire_error, lock_acquire_error[0]
+        assert lock_acquired_while_in_flight.is_set(), (
+            "Probe thread could not acquire lock while invoke_tool() was in flight — "
+            "lock was still held across future.result() (deadlock regression)"
+        )
