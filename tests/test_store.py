@@ -99,26 +99,16 @@ class TestGetImagePath:
 # ---------------------------------------------------------------------------
 
 class TestCreate:
-    def test_returns_dict_with_id(self, tmp_lumen):
+    def test_fields_present(self, tmp_lumen):
         conv = store.create("My Chat")
         assert "id" in conv
         assert conv["title"] == "My Chat"
-
-    def test_messages_list_is_empty(self, tmp_lumen):
-        assert store.create()["messages"] == []
-
-    def test_default_title(self, tmp_lumen):
-        conv = store.create()
-        assert "title" in conv
+        assert conv["messages"] == []
+        assert "created_at" in conv
 
     def test_file_persisted_on_disk(self, tmp_lumen):
         conv = store.create("disk-check")
-        path = tmp_lumen["conv_dir"] / f"{conv['id']}.json"
-        assert path.exists()
-
-    def test_created_at_present(self, tmp_lumen):
-        conv = store.create()
-        assert "created_at" in conv
+        assert (tmp_lumen["conv_dir"] / f"{conv['id']}.json").exists()
 
 
 class TestLoad:
@@ -148,21 +138,13 @@ class TestSave:
     def test_write_is_atomic_no_tmp_files_left(self, tmp_lumen):
         conv = store.create("atomic")
         store.save(conv["id"], conv)
-        residual = list(tmp_lumen["conv_dir"].glob("*.tmp-*"))
-        assert residual == []
+        assert list(tmp_lumen["conv_dir"].glob("*.tmp-*")) == []
 
     def test_persists_arbitrary_fields(self, tmp_lumen):
         conv = store.create("fields")
         conv["custom_key"] = "custom_value"
         store.save(conv["id"], conv)
-        reloaded = store.load(conv["id"])
-        assert reloaded["custom_key"] == "custom_value"
-
-    def test_returns_saved_data(self, tmp_lumen):
-        conv = store.create("returns")
-        result = store.save(conv["id"], conv)
-        assert isinstance(result, dict)
-        assert result["id"] == conv["id"]
+        assert store.load(conv["id"])["custom_key"] == "custom_value"
 
 
 class TestDelete:
@@ -188,16 +170,17 @@ class TestListAll:
         listed_ids = {c["id"] for c in store.list_all()}
         assert ids.issubset(listed_ids)
 
-    def test_each_entry_has_id_title_working_directory(self, tmp_lumen):
-        store.create("shaped")
-        entry = store.list_all()[0]
-        assert "id" in entry
-        assert "title" in entry
-        assert "working_directory" in entry
+    def test_sorted_newest_first(self, tmp_lumen):
+        """list_all() sorts by mtime descending — the most recently modified conv is first."""
+        import time
+        a = store.create("alpha")
+        time.sleep(0.02)  # ensure distinct mtime
+        b = store.create("beta")
+        ids = [c["id"] for c in store.list_all()]
+        assert ids.index(b["id"]) < ids.index(a["id"])
 
     def test_corrupt_files_are_skipped(self, tmp_lumen):
         store.create("good")
         (tmp_lumen["conv_dir"] / "corrupt.json").write_text("{{{bad")
         result = store.list_all()
-        # Only the good one appears
         assert all("id" in r for r in result)

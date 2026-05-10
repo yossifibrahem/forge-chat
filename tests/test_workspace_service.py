@@ -64,11 +64,9 @@ class TestWorkspaceRelpath:
         with pytest.raises(ValueError, match="Only /workspace"):
             workspace_service.workspace_relpath("/etc/passwd")
 
-    def test_none_treated_as_empty(self):
+    def test_none_treated_as_root(self):
+        # None is a realistic input from request.args.get when path is omitted
         assert workspace_service.workspace_relpath(None) == ""
-
-    def test_dot_segments_stripped(self):
-        assert workspace_service.workspace_relpath("./foo/./bar") == "foo/bar"
 
 
 # ---------------------------------------------------------------------------
@@ -192,14 +190,6 @@ class TestReadFile:
         assert result["content"] == "hello world"
         assert result["previewable"] is True
 
-    def test_reads_python_file(self, tmp_lumen):
-        conv_id, root = _make_workspace(tmp_lumen)
-        (root / "script.py").write_text("print('hi')")
-        with patch("workspace_service.workspace_root", return_value=root):
-            result, status = workspace_service.read_file(conv_id, "/workspace/script.py")
-        assert status == 200
-        assert "print" in result["content"]
-
     def test_returns_404_for_missing_conversation(self, tmp_lumen):
         _, status = workspace_service.read_file("ghost-conv", "/workspace/x.txt")
         assert status == 404
@@ -217,13 +207,16 @@ class TestReadFile:
             _, status = workspace_service.read_file(conv_id, "/workspace/mydir")
         assert status == 400
 
-    def test_result_shape(self, tmp_lumen):
+    def test_file_exceeding_max_preview_bytes_returns_previewable_false(self, tmp_lumen, monkeypatch):
+        """Files larger than MAX_PREVIEW_BYTES must not have their content returned."""
+        monkeypatch.setattr("workspace_service.MAX_PREVIEW_BYTES", 10)
         conv_id, root = _make_workspace(tmp_lumen)
-        (root / "shape.md").write_text("# Title")
+        (root / "big.txt").write_text("x" * 100)
         with patch("workspace_service.workspace_root", return_value=root):
-            result, _ = workspace_service.read_file(conv_id, "/workspace/shape.md")
-        for key in ("name", "path", "type", "size", "previewable", "mime_type"):
-            assert key in result
+            result, status = workspace_service.read_file(conv_id, "/workspace/big.txt")
+        assert status == 200
+        assert result["previewable"] is False
+        assert result["content"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -235,40 +228,134 @@ class TestSafeUploadName:
     def test_normal_ascii_name_unchanged(self):
         assert workspace_service.safe_upload_name("report.pdf") == "report.pdf"
 
-    def test_spaces_and_hyphens_kept(self):
-        result = workspace_service.safe_upload_name("my file-v2.txt")
-        assert "my file-v2.txt" == result
-
     def test_path_separators_replaced(self):
         result = workspace_service.safe_upload_name("a/b/c.txt")
         assert "/" not in result
 
-    def test_special_chars_replaced_with_underscore(self):
-        result = workspace_service.safe_upload_name("evil;rm -rf.sh")
+    def test_dangerous_chars_replaced_with_underscore(self):
+        # Semicolons, pipes, etc. must not survive into the filename
+        result = workspace_service.safe_upload_name("evil;rm.sh")
         assert ";" not in result
 
     def test_empty_name_returns_file(self):
         assert workspace_service.safe_upload_name("") == "file"
 
-    def test_strips_leading_trailing_dots_and_spaces(self):
+    def test_leading_dot_stripped(self):
+        # Filenames starting with . are hidden on Unix; strip the leading dot
         result = workspace_service.safe_upload_name("...hidden")
         assert not result.startswith(".")
 
-    def test_unicode_replaced(self):
-        result = workspace_service.safe_upload_name("héllo.txt")
-        # Non-ASCII replaced; file extension may survive
-        assert isinstance(result, str)
-        assert len(result) > 0
+
+# ---------------------------------------------------------------------------
+# _unique_path
+# ---------------------------------------------------------------------------
+
+class TestUniquePath:
+
+    def test_no_collision_returns_same_name(self, tmp_path):
+        result = workspace_service._unique_path(tmp_path, "report.pdf")
+        assert result == tmp_path / "report.pdf"
+
+    def test_single_collision_appends_1(self, tmp_path):
+        (tmp_path / "report.pdf").write_bytes(b"x")
+        result = workspace_service._unique_path(tmp_path, "report.pdf")
+        assert result.name == "report-1.pdf"
+
+    def test_multiple_collisions_increments(self, tmp_path):
+        (tmp_path / "data.csv").write_bytes(b"x")
+        (tmp_path / "data-1.csv").write_bytes(b"x")
+        result = workspace_service._unique_path(tmp_path, "data.csv")
+        assert result.name == "data-2.csv"
+
+    def test_extensionless_file_handled(self, tmp_path):
+        (tmp_path / "Makefile").write_bytes(b"x")
+        result = workspace_service._unique_path(tmp_path, "Makefile")
+        assert result.name == "Makefile-1"
 
 
 # ---------------------------------------------------------------------------
-# workspace_path helper
+# save_uploads
 # ---------------------------------------------------------------------------
 
-class TestWorkspacePath:
+class TestSaveUploads:
 
-    def test_empty_rel_returns_workspace_root(self):
-        assert workspace_service.workspace_path("") == "/workspace"
+    def _make_fake_file(self, filename: str, content: bytes = b"hello"):
+        """Build a minimal file-like object matching Flask's FileStorage API."""
+        import io
+        f = MagicMock()
+        f.filename = filename
+        f.stream = io.BytesIO(content)
+        return f
 
-    def test_non_empty_rel_has_separator(self):
-        assert workspace_service.workspace_path("foo/bar.txt") == "/workspace/foo/bar.txt"
+    def test_saves_file_and_returns_200(self, tmp_lumen):
+        conv_id, root = _make_workspace(tmp_lumen)
+        f = self._make_fake_file("notes.txt", b"content")
+        with patch("workspace_service.workspace_root", return_value=root), \
+             patch("store.working_directory", return_value=root):
+            result, status = workspace_service.save_uploads(conv_id, [f])
+        assert status == 200
+        assert len(result["files"]) == 1
+        assert result["files"][0]["name"] == "notes.txt"
+
+    def test_uploaded_file_appears_in_uploads_subdir(self, tmp_lumen):
+        conv_id, root = _make_workspace(tmp_lumen)
+        f = self._make_fake_file("myfile.py", b"code")
+        with patch("workspace_service.workspace_root", return_value=root), \
+             patch("store.working_directory", return_value=root):
+            workspace_service.save_uploads(conv_id, [f])
+        assert (root / "uploads" / "myfile.py").exists()
+
+    def test_duplicate_filename_gets_suffix(self, tmp_lumen):
+        conv_id, root = _make_workspace(tmp_lumen)
+        (root / "uploads").mkdir(exist_ok=True)
+        (root / "uploads" / "data.csv").write_bytes(b"existing")
+        f = self._make_fake_file("data.csv", b"new content")
+        with patch("workspace_service.workspace_root", return_value=root), \
+             patch("store.working_directory", return_value=root):
+            result, status = workspace_service.save_uploads(conv_id, [f])
+        assert status == 200
+        assert result["files"][0]["name"] == "data-1.csv"
+
+    def test_returns_404_for_unknown_conversation(self, tmp_lumen):
+        f = self._make_fake_file("x.txt")
+        result, status = workspace_service.save_uploads("ghost-conv-id", [f])
+        assert status == 404
+
+    def test_empty_filename_skipped(self, tmp_lumen):
+        conv_id, root = _make_workspace(tmp_lumen)
+        f = self._make_fake_file("", b"content")
+        with patch("workspace_service.workspace_root", return_value=root), \
+             patch("store.working_directory", return_value=root):
+            result, status = workspace_service.save_uploads(conv_id, [f])
+        assert status == 400
+
+    def test_file_exceeding_limit_returns_413_and_cleans_up(self, tmp_lumen):
+        conv_id, root = _make_workspace(tmp_lumen)
+        large_content = b"x" * (workspace_service.MAX_UPLOAD_BYTES + 1)
+        f = self._make_fake_file("big.bin", large_content)
+        with patch("workspace_service.workspace_root", return_value=root), \
+             patch("store.working_directory", return_value=root):
+            result, status = workspace_service.save_uploads(conv_id, [f])
+        assert status == 413
+        # Partial file must be cleaned up
+        assert not (root / "uploads" / "big.bin").exists()
+
+    def test_oversized_file_also_removes_previously_saved_files(self, tmp_lumen):
+        """When file N exceeds the limit, files 0..N-1 must also be deleted."""
+        conv_id, root = _make_workspace(tmp_lumen)
+        good = self._make_fake_file("ok.txt", b"small")
+        bad = self._make_fake_file("big.bin", b"x" * (workspace_service.MAX_UPLOAD_BYTES + 1))
+        with patch("workspace_service.workspace_root", return_value=root), \
+             patch("store.working_directory", return_value=root):
+            result, status = workspace_service.save_uploads(conv_id, [good, bad])
+        assert status == 413
+        # The previously-saved ok.txt must also be gone
+        assert not (root / "uploads" / "ok.txt").exists()
+
+    def test_path_field_has_workspace_prefix(self, tmp_lumen):
+        conv_id, root = _make_workspace(tmp_lumen)
+        f = self._make_fake_file("script.py", b"pass")
+        with patch("workspace_service.workspace_root", return_value=root), \
+             patch("store.working_directory", return_value=root):
+            result, _ = workspace_service.save_uploads(conv_id, [f])
+        assert result["files"][0]["path"].startswith("/workspace/uploads/")

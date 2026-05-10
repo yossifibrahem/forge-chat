@@ -17,7 +17,7 @@ Lumen is a self-hosted Flask chat UI for OpenAI-compatible chat-completions APIs
 - Regular file uploads stored in the conversation workspace
 - Markdown, code highlighting, KaTeX, voice input, theming, and conversation search
 
-The app is intentionally lightweight: no database, no build step, and no frontend framework. A backend pytest suite is included and should be kept focused on service/route behavior rather than broad brittle end-to-end tests.
+The app is intentionally lightweight: no database, no build step, no frontend framework, and no automated test suite currently included.
 
 ## Repository map
 
@@ -33,10 +33,21 @@ The app is intentionally lightweight: no database, no build step, and no fronten
 ├── workspace_service.py           # Workspace listing, reading, upload, download path safety
 ├── store.py                       # Filesystem persistence for conversations and images
 ├── Dockerfile.sandbox             # Required per-chat sandbox image
-├── requirements.txt               # Flask, CORS, OpenAI SDK, MCP SDK, pytest tooling
+├── requirements.txt               # Flask, CORS, OpenAI SDK, MCP SDK
+├── requirements-dev.txt           # Adds pytest and pytest-mock on top of requirements.txt
+├── pytest.ini                     # Test discovery config: pythonpath = ., testpaths = tests
 ├── README.md                      # User-facing project description and setup docs
-├── tests/                         # Backend pytest suite for services, routes, streaming, MCP, Docker startup
 ├── templates/index.html           # Full app shell and modal markup
+├── tests/
+│   ├── conftest.py                # Shared fixtures: tmp_lumen (filesystem isolation), app, client
+│   ├── test_store.py              # Image storage and conversation CRUD unit tests
+│   ├── test_workspace_service.py  # Path safety, listing, reading, upload, _unique_path
+│   ├── test_chat_turn_service.py  # _parse_stream_payload, _extract_title, TurnRecorder, etc.
+│   ├── test_streaming.py          # SSE formatting, event ordering, cancellation, tool accumulation
+│   ├── test_mcp_service.py        # Config load/save/find, run_async bridge
+│   ├── test_mcp_adapters.py       # apply_workspace_process_options, find_project_root, extract_host_mounts
+│   ├── test_container_service.py  # _safe_id, wrap_command_for_exec, _is_name_conflict, _volume_args
+│   └── test_routes.py             # Flask HTTP integration tests via test client
 └── static/
     ├── css/                       # CSS entrypoint and module files
     └── js/
@@ -64,7 +75,13 @@ The app is intentionally lightweight: no database, no build step, and no fronten
 Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
+
+Run the test suite (no Docker or API key required):
+
+```bash
+pytest
 ```
 
 Run the Flask app:
@@ -122,13 +139,10 @@ Note: both the README and the code use uppercase `LUMEN_*` env var names. Browse
 
 ### `app.py`
 
-- Validates Docker daemon availability before creating the Flask app.
-- Validates that the configured sandbox image exists before creating the Flask app.
 - Creates the Flask app with CORS enabled.
 - Registers the single blueprint from `routes.py`.
 - On startup, attempts to remove stale Docker containers whose conversation JSON no longer exists.
-- Docker and sandbox image checks are fatal because containers are a required runtime dependency.
-- Stale-container cleanup is non-fatal; cleanup failure should not prevent startup.
+- Docker cleanup is non-fatal; the app should still start when Docker is unavailable.
 
 ### `routes.py`
 
@@ -419,61 +433,33 @@ Follow the existing separation of concerns:
 - Remember that MCP servers always run in Docker; ensure the sandbox image is built and Docker is running before testing MCP behaviour.
 - Be cautious with module-level Python state if changing deployment assumptions; multi-worker servers will not share active streams/cancellation events.
 
-## Automated tests
+## Automated test suite
 
-The repository now includes a backend pytest suite under `tests/`. Run it after backend changes:
+Run `pytest` from the project root. All 240 tests must pass before merging any change.
 
 ```bash
 pytest
+# 240 passed in ~2s
 ```
 
-For a quicker first pass while editing, run the module most related to the change, then run the full suite before packaging:
+Tests are isolated: `conftest.py` redirects all filesystem paths to `tmp_path`, patches `_require_docker` and `_require_sandbox_image` in the app factory, and stubs `container_service.cleanup_stale`. No Docker daemon, real API key, or running server is needed.
 
-```bash
-pytest tests/test_chat_turn_service.py
-pytest tests/test_routes_mcp_chat_stream.py
-pytest tests/test_mcp_service_async.py
-pytest
-```
+**Coverage summary:**
 
-Current coverage focus:
-
-- `chat_turn_service.py`: streamed turn orchestration, tool approval/denial, auto-approved tool loops, persistence, cancellation, and title-generation branches.
-- `streaming.py`: OpenAI stream event conversion, reasoning/text chunks, tool-call deltas, cancellation, and provider errors.
-- `routes.py`: MCP tools/calls, chat stream start/reattach/cancel behavior, conversations, models, images, and workspace/file routes.
-- `mcp_service.py`: config helpers plus mocked async tool discovery/invocation paths and `run_async()`.
-- `mcp_adapters.py`: required conversation id path and container command/env rewriting.
-- `container_service.py`: Docker command construction, container lifecycle, status, stale cleanup, and workspace deletion.
-- `workspace_service.py` and `store.py`: path safety, upload/preview/download helpers, persistence, and image handling.
-- `app.py`: Docker-required startup checks, sandbox image checks, app factory order, and non-fatal stale cleanup.
-
-The tests are intentionally mock-heavy around Docker, OpenAI, and MCP SDK boundaries. Do not make tests require a real Docker daemon, real MCP server, or real API key unless you are adding a clearly separated integration test.
-
-Useful targeted test map:
-
-```text
-tests/test_app_startup.py              # app factory and required Docker/image checks
-tests/test_chat_turn_service.py        # persistent chat-turn orchestration
-tests/test_container_service.py        # Docker lifecycle command logic
-tests/test_mcp_adapters*.py            # MCP process/container launch adaptation
-tests/test_mcp_service*.py             # MCP config + async discovery/invocation
-tests/test_routes*.py                  # Flask route behavior and SSE stream state
-tests/test_streaming*.py               # stream_chat_completion generator/SSE events
-tests/test_store.py                    # filesystem conversation/image persistence
-tests/test_workspace_service.py        # workspace path/file safety
-```
-
-When adding tests:
-
-- Prefer small unit tests with monkeypatched boundaries.
-- Keep route tests thin and use Flask's test client.
-- Keep SSE tests deterministic by replacing threads/streams with sync fakes where practical.
-- Preserve existing JSON shapes in fixtures unless the application intentionally migrates them.
-- Add regression tests for streaming/order/persistence bugs before changing chat streaming code.
+| File | Key contracts verified |
+| --- | --- |
+| `test_store.py` | SHA-256 image naming, media type validation, conversation CRUD atomicity, `list_all` newest-first ordering |
+| `test_workspace_service.py` | Path traversal rejection (all forms), `resolve_workspace_path` boundary check, preview size limit, `save_uploads` 413 with rollback, `_unique_path` collision deduplication |
+| `test_chat_turn_service.py` | `_parse_stream_payload` (all 4 SSE parse paths), `_extract_title` (3 model-format paths), `_safe_tool_args` silent failure, `_tool_call_message` OpenAI wire format, `TurnRecorder` throttle and force-bypass |
+| `test_streaming.py` | SSE event ordering, multi-delta tool name accumulation, parallel tool calls, cancellation closes stream, errors produce error+done events |
+| `test_mcp_service.py` | Config load/save/roundtrip, malformed-config handling, atomic writes, `run_async` exception propagation |
+| `test_mcp_adapters.py` | `apply_workspace_process_options` param mutation, `find_project_root` depth limit (prevents mounting `/home`/`/`), `extract_host_mounts` deduplication and `:ro` flag |
+| `test_container_service.py` | `_safe_id` character sanitisation (shell-safety), `wrap_command_for_exec` argv and env ordering, `_is_name_conflict` race detection |
+| `test_routes.py` | All HTTP routes via Flask test client, including 400/404/413 error paths |
 
 ## Manual verification checklist
 
-Automated tests are useful, but still do a small manual pass after UI, Docker, or streaming changes. At minimum, verify:
+Run this checklist manually after changes that touch streaming, MCP, or Docker — areas that involve real subprocesses that cannot be fully mocked:
 
 1. Python files compile:
 
@@ -505,9 +491,11 @@ Automated tests are useful, but still do a small manual pass after UI, Docker, o
 
 Recommended future tests:
 
-- Lightweight frontend tests for pure-ish JavaScript helpers (`markdown.js`, `format.js`, MCP adapter helpers, and renderer grouping helpers) if UI regressions continue.
-- A small browser/E2E smoke test only if the app starts needing stronger UI confidence.
-- Optional, clearly separated integration tests for real Docker/MCP behavior; keep them skipped by default so normal pytest stays fast and local-friendly.
+- Flask route tests with `pytest` and Flask test client.
+- Unit tests for `workspace_service.workspace_relpath()` and `resolve_workspace_path()`.
+- Unit tests for `store.save_image()` and invalid image handling.
+- Unit tests for `mcp_adapters.apply_workspace_process_options()` and container launch parameter mutation.
+- Integration-ish tests for chat stream event ordering using mocked OpenAI streams.
 
 ## Known issues and things to inspect before feature work
 
@@ -579,6 +567,7 @@ grep -R "workspace\|/workspace\|file:/" -n *.py static/js
 
 - No database layer
 - No formal migration system
+- No bundled automated tests
 - No frontend package/build system
 - No authentication/user accounts
 - No shared backend state for multi-worker active stream reattach

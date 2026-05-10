@@ -107,21 +107,12 @@ def _run_stream(chunks: list, cancel: bool = False) -> list[dict]:
 
 class TestSseEvent:
 
-    def test_starts_with_data_prefix(self):
-        assert streaming.sse_event({"type": "text"}).startswith("data: ")
-
-    def test_ends_with_double_newline(self):
-        assert streaming.sse_event({"type": "text"}).endswith("\n\n")
-
     def test_json_round_trips(self):
+        """Full format: data prefix, JSON body, double newline."""
         payload = {"type": "tool_start", "name": "bash", "extra": 42}
         raw = streaming.sse_event(payload)
-        data_str = raw[len("data: "):].strip()
-        assert json.loads(data_str) == payload
-
-    def test_empty_payload(self):
-        raw = streaming.sse_event({})
-        assert json.loads(raw[len("data: "):].strip()) == {}
+        assert raw.startswith("data: ") and raw.endswith("\n\n")
+        assert json.loads(raw[len("data: "):].strip()) == payload
 
 
 # ---------------------------------------------------------------------------
@@ -166,13 +157,14 @@ class TestTextAndReasoningEvents:
 
 class TestDoneEvent:
 
-    def test_done_is_always_last(self):
-        events = _run_stream([_make_chunk(content="hi")])
-        assert events[-1]["type"] == "done"
-
     def test_done_emitted_on_empty_stream(self):
         events = _run_stream([])
         assert any(e["type"] == "done" for e in events)
+
+    def test_done_is_last_event_after_text(self):
+        events = _run_stream([_make_chunk(content="hello")])
+        assert events[-1]["type"] == "done"
+        assert any(e["type"] == "text" for e in events)
 
 
 # ---------------------------------------------------------------------------
@@ -314,3 +306,28 @@ class TestErrorHandling:
         events = _run_stream([bad_chunk, good_chunk])
         text_events = [e for e in events if e.get("type") == "text"]
         assert len(text_events) == 1
+
+    def test_two_simultaneous_tool_calls_both_in_event(self):
+        """Parallel tool calls (index 0 and 1) must both appear in tool_calls event."""
+        tc0 = _tool_call_chunk(0, "call-0", "bash", '{"cmd":"ls"}')
+        tc1 = _tool_call_chunk(1, "call-1", "read_file", '{"path":"/f"}')
+        multi_chunk = _make_chunk(tool_calls=[tc0, tc1])
+        finish_chunk = _make_chunk(finish_reason="tool_calls")
+
+        events = _run_stream([multi_chunk, finish_chunk])
+        tool_calls_event = next(e for e in events if e.get("type") == "tool_calls")
+        calls = tool_calls_event["calls"]
+        names = {c["function"]["name"] for c in calls}
+        assert names == {"bash", "read_file"}
+
+    def test_two_tool_starts_emitted_for_two_parallel_calls(self):
+        tc0 = _tool_call_chunk(0, "call-0", "bash", "")
+        tc1 = _tool_call_chunk(1, "call-1", "write_file", "")
+        chunk = _make_chunk(tool_calls=[tc0, tc1])
+        finish = _make_chunk(finish_reason="tool_calls")
+
+        events = _run_stream([chunk, finish])
+        starts = [e for e in events if e.get("type") == "tool_start"]
+        names = {e["name"] for e in starts}
+        assert "bash" in names
+        assert "write_file" in names

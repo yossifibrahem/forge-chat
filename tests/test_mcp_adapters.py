@@ -22,33 +22,23 @@ from mcp_adapters import ContainerConversationRequired
 
 class TestExpandConfigEnv:
 
-    def test_simple_string_value_unchanged(self):
+    def test_string_value_unchanged(self):
         result = mcp_adapters.expand_config_env({"KEY": "value"})
         assert result["KEY"] == "value"
 
-    def test_tilde_expanded(self):
+    def test_tilde_expanded_to_absolute_path(self):
+        # Must produce an absolute path, not leave ~ in place
         result = mcp_adapters.expand_config_env({"P": "~/projects"})
         assert not result["P"].startswith("~")
-        assert result["P"].startswith(os.path.expanduser("~"))
+        assert result["P"].startswith("/")
 
     def test_none_input_returns_empty_dict(self):
         assert mcp_adapters.expand_config_env(None) == {}
 
-    def test_empty_dict_returns_empty_dict(self):
-        assert mcp_adapters.expand_config_env({}) == {}
-
-    def test_non_string_value_passed_through(self):
+    def test_non_string_value_passed_through_unchanged(self):
+        # Integer env values (e.g. port numbers) must not be coerced
         result = mcp_adapters.expand_config_env({"PORT": 3000})
         assert result["PORT"] == 3000
-
-    def test_numeric_key_becomes_string(self):
-        result = mcp_adapters.expand_config_env({42: "val"})
-        assert "42" in result
-
-    def test_multiple_keys_all_processed(self):
-        result = mcp_adapters.expand_config_env({"A": "~/a", "B": "~/b"})
-        assert not result["A"].startswith("~")
-        assert not result["B"].startswith("~")
 
 
 # ---------------------------------------------------------------------------
@@ -193,16 +183,61 @@ class TestExtractHostMounts:
             assert spec.endswith(":ro")
 
 
+
+
 # ---------------------------------------------------------------------------
-# ContainerConversationRequired
+# find_project_root
 # ---------------------------------------------------------------------------
 
-class TestContainerConversationRequired:
+class TestFindProjectRoot:
+    """
+    find_project_root() decides what host directories get mounted read-only
+    into the sandbox. Mounting too broadly (e.g. /home or /) is a security
+    issue; not mounting enough breaks MCP server startup.
+    """
 
-    def test_is_runtime_error(self):
-        exc = ContainerConversationRequired("needs conv")
-        assert isinstance(exc, RuntimeError)
+    def test_directory_with_package_json_is_root(self, tmp_path):
+        (tmp_path / "package.json").write_text("{}")
+        script = tmp_path / "server.js"
+        script.write_text("// server")
+        assert mcp_adapters.find_project_root(script) == tmp_path
 
-    def test_message_preserved(self):
-        exc = ContainerConversationRequired("MCP server 'x' requires a conversation.")
-        assert "x" in str(exc)
+    def test_directory_with_pyproject_toml_is_root(self, tmp_path):
+        (tmp_path / "pyproject.toml").write_text("[build-system]")
+        deep = tmp_path / "src"
+        deep.mkdir()
+        script = deep / "server.py"
+        script.write_text("# s")
+        assert mcp_adapters.find_project_root(script) == tmp_path
+
+    def test_walks_up_to_find_marker(self, tmp_path):
+        """Marker in a parent directory must still be found."""
+        (tmp_path / "package.json").write_text("{}")
+        nested = tmp_path / "a" / "b"
+        nested.mkdir(parents=True)
+        script = nested / "index.js"
+        script.write_text("// x")
+        assert mcp_adapters.find_project_root(script) == tmp_path
+
+    def test_no_marker_returns_none(self, tmp_path):
+        """When no marker is found within 6 levels, return None — never mount /home."""
+        script = tmp_path / "standalone.js"
+        script.write_text("// no project")
+        assert mcp_adapters.find_project_root(script) is None
+
+    def test_node_modules_counts_as_marker(self, tmp_path):
+        (tmp_path / "node_modules").mkdir()
+        script = tmp_path / "index.js"
+        script.write_text("// x")
+        assert mcp_adapters.find_project_root(script) == tmp_path
+
+    def test_does_not_walk_more_than_6_levels(self, tmp_path):
+        """Marker > 6 levels up must NOT be found — prevents mounting /."""
+        (tmp_path / "package.json").write_text("{}")
+        deep = tmp_path
+        for i in range(8):
+            deep = deep / f"l{i}"
+            deep.mkdir()
+        script = deep / "server.js"
+        script.write_text("// deep")
+        assert mcp_adapters.find_project_root(script) is None

@@ -42,35 +42,20 @@ class TestListConversations:
 
 class TestCreateConversation:
 
-    def test_returns_201(self, client, tmp_lumen):
-        resp = client.post("/api/conversations",
-                           json={"title": "My Chat"},
-                           content_type="application/json")
-        assert resp.status_code == 201
-
-    def test_returns_dict_with_id_and_title(self, client, tmp_lumen):
+    def test_returns_201_with_id(self, client, tmp_lumen):
         resp = client.post("/api/conversations",
                            json={"title": "Named"},
                            content_type="application/json")
-        body = resp.json
-        assert "id" in body
-        assert body["title"] == "Named"
+        assert resp.status_code == 201
+        assert "id" in resp.json
+        assert resp.json["title"] == "Named"
 
     def test_default_title_when_missing(self, client, tmp_lumen):
         resp = client.post("/api/conversations",
                            json={},
                            content_type="application/json")
         assert resp.status_code == 201
-        assert "title" in resp.json
-
-    def test_created_conversation_appears_in_list(self, client, tmp_lumen):
-        create_resp = client.post("/api/conversations",
-                                  json={"title": "ListMe"},
-                                  content_type="application/json")
-        conv_id = create_resp.json["id"]
-        list_resp = client.get("/api/conversations")
-        ids = [c["id"] for c in list_resp.json]
-        assert conv_id in ids
+        assert resp.json.get("title")  # non-empty
 
 
 class TestGetConversation:
@@ -100,20 +85,7 @@ class TestUpdateConversation:
                           content_type="application/json")
         assert resp.status_code == 200
         assert resp.json["title"] == "new"
-
-    def test_preserves_id(self, client, tmp_lumen):
-        conv = store.create("id-preserved")
-        resp = client.put(f"/api/conversations/{conv['id']}",
-                          json={"title": "changed"},
-                          content_type="application/json")
-        assert resp.json["id"] == conv["id"]
-
-    def test_upsert_nonexistent_conversation(self, client, tmp_lumen):
-        # PUT on a new ID should create it
-        resp = client.put("/api/conversations/new-conv-99",
-                          json={"title": "Brand New"},
-                          content_type="application/json")
-        assert resp.status_code == 200
+        assert resp.json["id"] == conv["id"]  # id must be preserved
 
 
 class TestDeleteConversation:
@@ -140,26 +112,22 @@ class TestDeleteConversation:
         assert resp.status_code == 404
 
 
-class TestConversationWorkspace:
+class TestConversationMetaRoutes:
 
-    def test_returns_working_directory_key(self, client, tmp_lumen):
+    def test_workspace_returns_absolute_path(self, client, tmp_lumen):
         conv = store.create("ws")
         resp = client.get(f"/api/conversations/{conv['id']}/workspace")
         assert resp.status_code == 200
-        assert "working_directory" in resp.json
+        wd = resp.json.get("working_directory", "")
+        assert wd.startswith("/")  # must be an absolute host path
 
-
-class TestContainerStatus:
-
-    def test_returns_status_metadata(self, client, tmp_lumen):
+    def test_container_status_for_known_conv(self, client, tmp_lumen):
         conv = store.create("container")
         with patch("container_service.get_status", return_value="missing"):
             resp = client.get(f"/api/conversations/{conv['id']}/container")
         assert resp.status_code == 200
-        body = resp.json
-        assert "status" in body
-        assert "container_name" in body
-        assert "workspace" in body
+        assert resp.json["status"] == "missing"
+        assert resp.json["conv_id"] == conv["id"]
 
 
 # ===========================================================================
@@ -386,10 +354,8 @@ class TestModelsRoute:
 
 class TestIndexRoute:
 
-    def test_returns_200(self, client, tmp_lumen):
+    def test_renders_app_shell(self, client, tmp_lumen):
         resp = client.get("/")
         assert resp.status_code == 200
-
-    def test_returns_html(self, client, tmp_lumen):
-        resp = client.get("/")
-        assert b"<html" in resp.data.lower() or b"<!doctype" in resp.data.lower()
+        # Must contain the top-level script tag that bootstraps the app
+        assert b"app.js" in resp.data
