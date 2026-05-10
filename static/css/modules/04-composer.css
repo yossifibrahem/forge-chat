@@ -35,7 +35,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px 14px 0;
+  padding: 8px 8px 8px 8px;
 }
 
 #user-input {
@@ -278,7 +278,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 20px 8px 8px;
+  padding: 20px 8px 8px 8px;
   background: linear-gradient(180deg, transparent, rgba(0,0,0,.78));
 }
 .composer-attachment-name {
