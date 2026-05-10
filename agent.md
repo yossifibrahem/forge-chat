@@ -615,15 +615,11 @@ Short-term deployment default: one worker with threads, as in `gunicorn.conf.py`
 
 Long-term fix: move cancellation and stream event delivery to Redis/pub-sub or another shared backend.
 
-### 2. MCP tool names are model-facing namespaces
-
-MCP tool names sent to the API are intentionally namespaced as `server_tool` so duplicate bare tool names from different enabled servers cannot collide. The metadata payload keeps both the namespaced `name` and bare `originalName`, and `chat_turn_service._bare_tool_name()` is the single helper used to recover the bare MCP tool name for UI display and server dispatch. Keep descriptions unprefixed; server labels belong in UI grouping, not in the model-facing `description` field.
-
-### 3. No authentication/user accounts
+### 2. No authentication/user accounts
 
 The app is local-first and self-hosted. Do not expose it publicly without adding authentication, stricter CORS, rate limiting, and stronger secret handling.
 
-### 4. No database or migration layer
+### 3. No database or migration layer
 
 Persistent JSON shapes should remain backward-compatible, or migration code should be added deliberately.
 
