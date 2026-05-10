@@ -11,6 +11,7 @@ import binascii
 import hashlib
 import json
 import re
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,55 @@ IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 _SAFE_IMAGE_EXTENSIONS = {'png', 'jpeg', 'webp', 'gif'}
 _SAFE_NAME = re.compile(r'^[a-f0-9]{64}\.(png|jpeg|webp|gif)$')
+
+_index: list[dict] | None = None
+_index_dir: Path | None = None
+_index_lock = threading.RLock()
+
+
+def _conversation_summary(path: Path) -> dict | None:
+    try:
+        data = json.loads(path.read_text())
+        return {
+            "id":                path.stem,
+            "title":             data.get("title", "Untitled"),
+            "working_directory": str(working_directory(path.stem)),
+        }
+    except Exception:
+        return None
+
+
+def _rebuild_index() -> None:
+    global _index, _index_dir
+    with _index_lock:
+        summaries = []
+        for path in sorted(CONVERSATIONS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+            summary = _conversation_summary(path)
+            if summary:
+                summaries.append(summary)
+        _index = summaries
+        _index_dir = CONVERSATIONS_DIR
+
+
+def _update_index_for(conv_id: str, data: dict) -> None:
+    global _index
+    with _index_lock:
+        if _index is None:
+            return
+        summary = {
+            "id": conv_id,
+            "title": data.get("title", "Untitled"),
+            "working_directory": str(working_directory(conv_id)),
+        }
+        _index = [item for item in _index if item.get("id") != conv_id]
+        _index.insert(0, summary)
+
+
+def _remove_index_entry(conv_id: str) -> None:
+    global _index
+    with _index_lock:
+        if _index is not None:
+            _index = [item for item in _index if item.get("id") != conv_id]
 
 
 # ── Image storage ─────────────────────────────────────────────────────────────
@@ -71,19 +121,11 @@ def working_directory(conv_id: str) -> Path:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def list_all() -> list[dict]:
-    """Return conversation summaries sorted by most-recently modified."""
-    results: list[dict] = []
-    for path in sorted(CONVERSATIONS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-        try:
-            data = json.loads(path.read_text())
-            results.append({
-                "id":                path.stem,
-                "title":             data.get("title", "Untitled"),
-                "working_directory": str(working_directory(path.stem)),
-            })
-        except Exception:
-            pass
-    return results
+    """Return cached conversation summaries sorted by most-recently modified."""
+    with _index_lock:
+        if _index is None or _index_dir != CONVERSATIONS_DIR:
+            _rebuild_index()
+        return list(_index or [])
 
 
 def load(conv_id: str) -> dict | None:
@@ -103,6 +145,7 @@ def save(conv_id: str, data: dict) -> dict:
     tmp_path = path.with_suffix(f".tmp-{uuid.uuid4().hex}")
     tmp_path.write_text(json.dumps(data, indent=2))
     tmp_path.replace(path)
+    _update_index_for(conv_id, data)
     return data
 
 
@@ -110,6 +153,7 @@ def delete(conv_id: str) -> bool:
     path = _path(conv_id)
     if path.exists():
         path.unlink()
+        _remove_index_entry(conv_id)
         return True
     return False
 

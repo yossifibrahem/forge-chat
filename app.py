@@ -10,6 +10,7 @@ import atexit
 import logging
 import signal
 import subprocess
+import os
 import sys
 
 from flask import Flask
@@ -30,7 +31,16 @@ def create_app() -> Flask:
     _require_docker()
     _require_sandbox_image()
     app = Flask(__name__)
-    CORS(app)
+    app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("LUMEN_MAX_CONTENT_LENGTH", str(60 * 1024 * 1024)))
+    allowed_origins = [
+        origin.strip()
+        for origin in os.getenv(
+            "LUMEN_CORS_ORIGINS",
+            "http://localhost:8080,http://127.0.0.1:8080",
+        ).split(",")
+        if origin.strip()
+    ]
+    CORS(app, origins=allowed_origins)
     app.register_blueprint(blueprint)
     _cleanup_stale_containers()
     _register_shutdown_cleanup()

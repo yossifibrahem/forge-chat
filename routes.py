@@ -10,6 +10,7 @@ import uuid
 
 from flask import Blueprint, jsonify, render_template, request, send_file
 
+import app_config
 import chat_turn_service
 import container_service
 import mcp_service
@@ -111,8 +112,12 @@ def get_container_status(conv_id: str):
 
 @blueprint.route("/api/conversations/<conv_id>", methods=["PUT"])
 def update_conversation(conv_id: str):
+    allowed_fields = {"title", "system_prompt"}
+    body = _body()
     data = store.load(conv_id) or {"id": conv_id}
-    data.update(_body())
+    for key in allowed_fields:
+        if key in body:
+            data[key] = body[key]
     data["id"] = conv_id
     return jsonify(store.save(conv_id, data))
 
@@ -320,6 +325,21 @@ def chat_approve():
     approved = bool(body.get("approved", False))
     chat_turn_service.resolve_tool_approval(stream_id, call_id, approved)
     return jsonify({"ok": True})
+
+
+# ── API provider settings ─────────────────────────────────────────────────────
+
+@blueprint.route("/api/settings", methods=["GET"])
+def get_api_settings():
+    return jsonify(app_config.public_config())
+
+
+@blueprint.route("/api/settings", methods=["POST"])
+def save_api_settings():
+    try:
+        return jsonify(app_config.save_config(_body()))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
 
 # ── Models ────────────────────────────────────────────────────────────────────

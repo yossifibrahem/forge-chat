@@ -10,7 +10,8 @@ import { openModal, closeModal, toggleSidebar, autoResize, updateCharCount, init
 import { loadSettings, saveSettings, saveChatSettings, fetchModels, initKeyToggle, initParameterSliders } from './settings.js';
 import { loadConversationList, openConversation, renameConversationTitle, startNewChat } from './conversations.js';
 import { loadMcpConfig, saveMcpConfig, reloadTools, loadCachedTools } from './mcp.js';
-import { sendMessage, stopAssistantTurn, editAndResend, regenerateFrom, initImageAttachments, hasPendingAttachments } from './chat.js';
+import { sendMessage, stopAssistantTurn, editAndResend, regenerateFrom } from './chat.js';
+import { initImageAttachments, hasPendingAttachments } from './chat_attachments.js';
 import { initVoiceInput } from './voice.js';
 import { clearMessages } from './renderer.js';
 import { ICONS, initIcons } from './icons.js';

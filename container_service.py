@@ -319,7 +319,7 @@ def _reap_once() -> None:
     with _last_used_lock:
         candidates = [
             cid for cid, ts in _last_used.items()
-            if cid != DISCOVERY_CONTAINER_ID and now - ts > IDLE_TIMEOUT
+            if cid != DISCOVERY_CONTAINER_ID and (ts <= 0 or now - ts > IDLE_TIMEOUT)
         ]
     for conv_id in candidates:
         if get_status(conv_id) == "running":

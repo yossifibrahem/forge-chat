@@ -16,15 +16,21 @@ export function loadSettings() {
   renderModelList(cachedModels || []);
 
   _syncAPIUI();
+  _loadServerApiSettings();
   _syncChatUI();
   updateModelBadge();
   updateInputHint();
 }
 
-export function saveSettings() {
+export async function saveSettings() {
   _readAPIControls();
   _persistSettings();
+  const saved = await _saveServerApiSettings();
   updateModelBadge();
+  if (saved?.error) {
+    showStatus('settings-status', `Settings saved locally, but API config failed: ${saved.error}`, 'err');
+    return;
+  }
   showStatus('settings-status', 'Settings saved ✓', 'ok');
   showToast('Settings saved');
 }
@@ -51,6 +57,33 @@ function _persistSettings() {
   storage.set(STORAGE_KEYS.settings, Object.fromEntries(SETTINGS_KEYS.map(key => [key, state[key]])));
 }
 
+async function _loadServerApiSettings() {
+  try {
+    const data = await api.get('/api/settings');
+    if (data?.api_base) state.apiBase = data.api_base;
+    state.serverHasApiKey = !!data?.has_api_key;
+    _syncAPIUI();
+  } catch {}
+}
+
+async function _saveServerApiSettings() {
+  const keyInput = document.getElementById('api-key');
+  const data = await api.post('/api/settings', {
+    api_base: state.apiBase,
+    api_key: keyInput?.value.trim() || '',
+  });
+  if (!data.error) {
+    if (data.api_base) state.apiBase = data.api_base;
+    state.serverHasApiKey = !!data.has_api_key;
+    if (keyInput) {
+      keyInput.value = '';
+      keyInput.placeholder = state.serverHasApiKey ? 'Saved on server — leave blank to keep' : 'sk-…';
+    }
+    _persistSettings();
+  }
+  return data;
+}
+
 // ── Model list ────────────────────────────────────────────────────────────────
 
 let _modelFetchId = 0;
@@ -70,10 +103,14 @@ export async function fetchModels() {
   _setModelStatus('Loading models…', 'Checking the API connection.', 'ok');
 
   try {
-    const data = await api.post('/api/models', {
-      api_base: document.getElementById('api-base').value.trim(),
-      api_key:  document.getElementById('api-key').value.trim(),
-    });
+    _readAPIControls();
+    _persistSettings();
+    const saved = await _saveServerApiSettings();
+    if (saved?.error) {
+      _setModelStatus('Could not save API settings', saved.error, 'err');
+      return;
+    }
+    const data = await api.post('/api/models', {});
     if (fetchId !== _modelFetchId) return;
 
     if (data.error) {
@@ -191,7 +228,11 @@ export function initParameterSliders() {
 function _syncAPIUI() {
   const el = id => document.getElementById(id);
   el('api-base').value = state.apiBase;
-  el('api-key').value  = state.apiKey;
+  const keyInput = el('api-key');
+  if (keyInput) {
+    keyInput.value = '';
+    keyInput.placeholder = state.serverHasApiKey ? 'Saved on server — leave blank to keep' : 'sk-…';
+  }
 
   const temp = el('setting-temperature');
   if (temp) { temp.value = state.temperature; }
@@ -209,8 +250,7 @@ function _syncChatUI() {
 }
 
 function _readAPIControls() {
-  state.apiBase        = document.getElementById('api-base').value.trim();
-  state.apiKey         = document.getElementById('api-key').value.trim();
+  state.apiBase = document.getElementById('api-base').value.trim();
 
   const temp = document.getElementById('setting-temperature');
   if (temp) state.temperature = parseFloat(temp.value);

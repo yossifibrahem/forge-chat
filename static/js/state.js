@@ -1,7 +1,7 @@
 // Defaults applied both on first load and when resetting settings.
 export const SETTINGS_DEFAULTS = {
   apiBase:      'https://api.openai.com/v1',
-  apiKey:       '',
+  serverHasApiKey: false,
   model:        '',
   systemPrompt: '',
   // Model parameters

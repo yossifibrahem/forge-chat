@@ -2,7 +2,6 @@
 
 import { api }   from './api.js';
 import { state } from './state.js';
-import { ICONS } from './icons.js';
 import {
   createStreamingMessage, appendMessage,
   cancelAllToolApprovals, finalizeStreamingMessage, setStreamingMessageLogIndex,
@@ -11,275 +10,23 @@ import {
   createToolStrip, toolStripFinalize, toolStripSetApproval, toolStripSetRunning,
 } from './renderer.js';
 import { applyMarkdown } from './markdown.js';
-import { isServerEnabled, isServerAutoApprove } from './mcp.js';
-import { buildMcpSystemPrompt as buildMcpPrompt } from './mcp_policy.js';
 import { persistConversationFor, createNewConversation } from './conversations.js';
 import { refreshFilePanel } from './file_panel.js';
-import { escapeHtml, formatBytes, fileExtensionLabel } from './format.js';
+import { escapeHtml } from './format.js';
+import { readResponseError, readSSEStream } from './stream_consumer.js';
+import { initImageAttachments, hasPendingAttachments } from './chat_attachments.js';
+export { initImageAttachments, hasPendingAttachments } from './chat_attachments.js';
+import { buildApiMessages, buildToolsPayload, buildMcpToolMetaPayload } from './chat_payloads.js';
+import { sendMessage as sendMessageImpl } from './chat_send.js';
+import { editAndResend as editAndResendImpl, regenerateFrom as regenerateFromImpl } from './chat_edit.js';
 
 let turnAbortController = null;
 let turnCancelled = false;
 const activeTurns = new Map();
 
-// ── Pending attachments ──────────────────────────────────────────────────────
+// Attachment handling lives in chat_attachments.js.
 
-// Keep one ordered list so mixed uploads render in the exact order the user picked them.
-// Image entry: { kind: 'image', previewUrl, uploadPromise, name, size }
-// File entry:  { kind: 'file', file, name, size }
-let pendingAttachments = [];
-let pendingAttachmentAdds = Promise.resolve();
-
-function getImagePreviewBar() { return document.getElementById('image-preview-bar'); }
-
-export function hasPendingAttachments() {
-  return pendingAttachments.length > 0;
-}
-
-function notifyAttachmentsChanged() {
-  document.dispatchEvent(new CustomEvent('chat:attachments-changed', {
-    detail: { hasAttachments: hasPendingAttachments() },
-  }));
-}
-
-function refreshImagePreviewBar() {
-  const bar = getImagePreviewBar();
-  if (!bar) return;
-  if (!pendingAttachments.length) {
-    bar.hidden = true;
-    bar.innerHTML = '';
-    notifyAttachmentsChanged();
-    return;
-  }
-  bar.hidden = false;
-  bar.innerHTML = '';
-
-  pendingAttachments.forEach((entry, idx) => {
-    const wrap = document.createElement('div');
-    wrap.className = `composer-attachment-card ${entry.kind === 'image' ? 'composer-image-card' : 'composer-file-card'}`;
-
-    if (entry.kind === 'image') {
-      wrap.innerHTML = `
-        <img class="composer-attachment-thumb img-preview-uploading" src="${entry.previewUrl}" alt="" />
-        <div class="composer-attachment-meta composer-attachment-meta-overlay">
-          <div class="composer-attachment-name" title="${escapeHtml(entry.name || 'image')}">${escapeHtml(entry.name || 'image')}</div>
-          <div class="composer-attachment-subtle">${formatBytes(entry.size || 0)}</div>
-        </div>
-        <button class="img-preview-remove" title="Remove attachment" aria-label="Remove attachment">
-          ${ICONS.close}
-        </button>`;
-
-      const thumb = wrap.querySelector('.composer-attachment-thumb');
-      entry.uploadPromise.then(result => {
-        if (result) thumb.classList.remove('img-preview-uploading');
-        else        thumb.classList.add('img-preview-error');
-      });
-    } else {
-      wrap.innerHTML = `
-        <div class="composer-attachment-meta">
-          <div class="composer-attachment-name" title="${escapeHtml(entry.name || 'file')}">${escapeHtml(entry.name || 'file')}</div>
-          <div class="composer-attachment-subtle">${formatBytes(entry.size || 0)}</div>
-          <div class="composer-attachment-badge-row">
-            <span class="composer-attachment-badge">${escapeHtml(fileExtensionLabel(entry.name || 'file'))}</span>
-          </div>
-        </div>
-        <button class="img-preview-remove" title="Remove attachment" aria-label="Remove attachment">
-          ${ICONS.close}
-        </button>`;
-    }
-
-    wrap.querySelector('.img-preview-remove').addEventListener('click', () => {
-      pendingAttachments.splice(idx, 1);
-      refreshImagePreviewBar();
-    });
-    bar.appendChild(wrap);
-  });
-  notifyAttachmentsChanged();
-}
-
-/** Read a File into a base64 data-URL, returning { dataUrl, mediaType, name }. */
-function readFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload  = () => resolve({ dataUrl: reader.result, mediaType: file.type || 'image/png', name: file.name });
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-/** Upload base64 image to the server; returns { ref, url, mediaType } or null on failure. */
-async function uploadImage(dataUrl, mediaType) {
-  const base64 = dataUrl.split(',')[1];
-  try {
-    const result = await api.post('/api/images', { data: base64, media_type: mediaType });
-    if (result.error) return null;
-    return { ref: result.ref, url: result.url, mediaType };
-  } catch {
-    return null;
-  }
-}
-
-async function uploadConversationFiles(convId, entries) {
-  if (!entries.length) return [];
-  const form = new FormData();
-  entries.forEach(entry => form.append('files', entry.file, entry.name));
-
-  const response = await fetch(`/api/conversations/${encodeURIComponent(convId)}/files`, {
-    method: 'POST',
-    body: form,
-  });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok || result.error) {
-    throw new Error(result.error || `Failed to upload file(s) (${response.status})`);
-  }
-  return Array.isArray(result.files) ? result.files : [];
-}
-
-function addRegularFiles(files) {
-  for (const file of Array.from(files)) {
-    if (!file || file.type.startsWith('image/')) continue;
-    pendingAttachments.push({ kind: 'file', file, name: file.name || 'file', size: file.size || 0 });
-  }
-  refreshImagePreviewBar();
-}
-
-async function addImageFiles(files) {
-  for (const file of Array.from(files)) {
-    if (!file.type.startsWith('image/')) continue;
-    try {
-      const { dataUrl, mediaType } = await readFile(file);
-      const uploadPromise = uploadImage(dataUrl, mediaType);
-      pendingAttachments.push({ kind: 'image', previewUrl: dataUrl, uploadPromise, name: file.name || 'image', size: file.size || 0 });
-      refreshImagePreviewBar(); // show thumb immediately, upload in background
-    } catch {}
-  }
-}
-
-async function addAttachmentFiles(files) {
-  // Sequential processing preserves the user's selected order across mixed image/file uploads.
-  for (const file of Array.from(files)) {
-    if (!file) continue;
-    if (file.type.startsWith('image/')) await addImageFiles([file]);
-    else addRegularFiles([file]);
-  }
-}
-
-export function initImageAttachments() {
-  const attachBtn       = document.getElementById('attach-btn');
-  const attachmentInput = document.getElementById('attachment-input') || document.getElementById('image-input');
-  const textarea        = document.getElementById('user-input');
-
-  attachBtn?.addEventListener('click', () => attachmentInput?.click());
-  attachmentInput?.addEventListener('change', e => {
-    const files = Array.from(e.target.files || []);
-    pendingAttachmentAdds = pendingAttachmentAdds.then(() => addAttachmentFiles(files)).catch(() => {});
-    attachmentInput.value = '';
-  });
-
-  textarea?.addEventListener('paste', e => {
-    const items = Array.from(e.clipboardData?.items || []);
-    const fileItems = items.filter(i => i.kind === 'file');
-    if (!fileItems.length) return;
-    const files = fileItems.map(i => i.getAsFile()).filter(Boolean);
-    if (!files.length) return;
-    e.preventDefault();
-    pendingAttachmentAdds = pendingAttachmentAdds.then(() => addAttachmentFiles(files)).catch(() => {});
-  });
-}
-
-// ── Payload builders ──────────────────────────────────────────────────────────
-
-function buildToolsPayload() {
-  return state.mcpTools
-    .filter(tool => isServerEnabled(tool.server))
-    .map(tool => ({
-      type: 'function',
-      function: {
-        name:        tool.name,
-        description: tool.description,
-        parameters:  tool.inputSchema || { type: 'object', properties: {} },
-      },
-    }));
-}
-
-function buildMcpToolMetaPayload() {
-  return state.mcpTools
-    .filter(tool => isServerEnabled(tool.server))
-    .map(tool => ({
-      name: tool.name,
-      server: tool.server,
-      autoApprove: isServerAutoApprove(tool.server),
-    }));
-}
-
-/** Fetch a server-stored image and return it as a base64 data-URL. */
-async function imageRefToDataUrl(ref) {
-  const resp = await fetch(`/api/images/${ref}`);
-  const blob = await resp.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload  = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-/** Expand image_ref content blocks into image_url blocks the OpenAI API understands. */
-async function expandImageRefs(messages) {
-  return Promise.all(messages.map(async msg => {
-    if (!Array.isArray(msg.content)) return msg;
-    const expanded = await Promise.all(msg.content.map(async part => {
-      if (part.type !== 'image_ref') return part;
-      try {
-        const url = await imageRefToDataUrl(part.ref);
-        return { type: 'image_url', image_url: { url } };
-      } catch {
-        return null; // skip unresolvable refs rather than crashing
-      }
-    }));
-    return { ...msg, content: expanded.filter(Boolean) };
-  }));
-}
-
-function formatAttachmentContext(files = []) {
-  const validFiles = files.filter(file => file?.path);
-  if (!validFiles.length) return '';
-  return [
-    'Attached file(s) available in the chat workspace:',
-    ...validFiles.map(file => `- ${file.name || 'file'}: ${file.path}`),
-  ].join('\n');
-}
-
-function appendTextToContent(content, extraText) {
-  if (!extraText) return content;
-  if (typeof content === 'string') return [content, extraText].filter(Boolean).join('\n\n');
-
-  if (Array.isArray(content)) {
-    const parts = content.map(part => ({ ...part }));
-    const textPart = parts.find(part => part.type === 'text');
-    if (textPart) textPart.text = [textPart.text || '', extraText].filter(Boolean).join('\n\n');
-    else parts.unshift({ type: 'text', text: extraText });
-    return parts;
-  }
-
-  return extraText;
-}
-
-function prepareMessageForApi(message) {
-  const { attachments, ...cleanMessage } = message;
-  const fileContext = message.role === 'user' ? formatAttachmentContext(attachments || []) : '';
-  return fileContext
-    ? { ...cleanMessage, content: appendTextToContent(cleanMessage.content, fileContext) }
-    : cleanMessage;
-}
-
-async function buildApiMessages(turnMessages) {
-  const messages = [];
-  const systemParts = [state.systemPrompt, buildMcpPrompt({ tools: state.mcpTools, isServerEnabled })].filter(Boolean);
-  if (systemParts.length) messages.push({ role: 'system', content: systemParts.join('\n\n') });
-
-  messages.push(...turnMessages.map(prepareMessageForApi));
-  return expandImageRefs(messages);
-}
+// Payload construction lives in chat_payloads.js.
 
 // ── Streaming state ───────────────────────────────────────────────────────────
 
@@ -422,7 +169,7 @@ async function attachServerStream(convId, streamId, data = {}) {
 
     if (!resp.ok) throw new Error(await readResponseError(resp));
 
-    const success = await readSSEStream(resp, ctx);
+    const success = await readSSEStream(resp, raw => processSSEEvent(raw, ctx));
     if (!success || turnCancelled) return false;
 
     if (!ctx.assistantDone) finalizeAssistantAnswer(ctx);
@@ -574,104 +321,23 @@ export async function stopAssistantTurn() {
   }
 }
 
+function chatFlowDeps() {
+  return {
+    createNewConversation,
+    createTurnContext,
+    setStreaming,
+    syncVisibleTurn,
+    isTurnVisible,
+    persistTurnConversation,
+    runAssistantTurnAndPersist,
+    hasPendingAttachments,
+  };
+}
+
 // ── Main entry point ──────────────────────────────────────────────────────────
 
 export async function sendMessage(userText) {
-  await pendingAttachmentAdds;
-  if (!userText.trim() && !pendingAttachments.length) return;
-  if (state.isStreaming) return;
-  if (!state.convId) await createNewConversation();
-
-  const turn = createTurnContext(state.convId);
-  setStreaming(true);
-
-  const textToSend        = userText.trim();
-  const attachmentsToSend = pendingAttachments.splice(0);
-  const imagesToSend      = attachmentsToSend.filter(entry => entry.kind === 'image');
-  const filesToSend       = attachmentsToSend.filter(entry => entry.kind === 'file');
-  refreshImagePreviewBar();
-
-  // Resolve images first so a failed image does not silently disappear from the sent message.
-  const uploadedRefs = await Promise.all(imagesToSend.map(img => img.uploadPromise));
-  const failedImageCount = uploadedRefs.filter(result => !result).length;
-  if (failedImageCount) {
-    pendingAttachments.unshift(...attachmentsToSend);
-    refreshImagePreviewBar();
-    setStreaming(false);
-    const plural = failedImageCount === 1 ? '' : 's';
-    const errorText = `Image upload failed for ${failedImageCount} attachment${plural}. Remove it or try again before sending.`;
-    turn.displayLog.push({ type: 'message', role: 'assistant', content: errorText });
-    syncVisibleTurn(turn);
-    if (isTurnVisible(turn)) appendMessage('assistant', errorText, turn.displayLog.length - 1);
-    return;
-  }
-
-  // Copy regular files into the chat workspace.
-  let uploadedFiles = [];
-  try {
-    uploadedFiles = await uploadConversationFiles(turn.convId, filesToSend);
-    if (isTurnVisible(turn)) refreshFilePanel({ keepPreview: true }).catch(() => {});
-  } catch (err) {
-    pendingAttachments.unshift(...attachmentsToSend);
-    refreshImagePreviewBar();
-    setStreaming(false);
-    const errorText = `File upload failed: ${err.message}`;
-    turn.displayLog.push({ type: 'message', role: 'assistant', content: errorText });
-    syncVisibleTurn(turn);
-    if (isTurnVisible(turn)) appendMessage('assistant', errorText, turn.displayLog.length - 1);
-    return;
-  }
-
-  const displayAttachments = [];
-  let imageCursor = 0;
-  let fileCursor = 0;
-  attachmentsToSend.forEach(entry => {
-    if (entry.kind === 'image') {
-      const uploaded = uploadedRefs[imageCursor++];
-      displayAttachments.push({
-        kind: 'image',
-        url: uploaded.url,
-        ref: uploaded.ref,
-        mediaType: uploaded.mediaType,
-        name: entry.name || 'image',
-        size: entry.size || 0,
-      });
-    } else {
-      const uploaded = uploadedFiles[fileCursor++];
-      if (uploaded) displayAttachments.push({ kind: 'file', ...uploaded });
-    }
-  });
-
-  const imageAttachments = displayAttachments.filter(entry => entry.kind === 'image');
-
-  let apiContent;
-  if (imageAttachments.length > 0) {
-    // API payload: user-visible text + image_ref blocks. File paths are injected
-    // later by buildApiMessages() from message attachment metadata.
-    apiContent = [];
-    if (textToSend) apiContent.push({ type: 'text', text: textToSend });
-    imageAttachments.forEach(entry => apiContent.push({ type: 'image_ref', ref: entry.ref }));
-  } else {
-    apiContent = textToSend;
-  }
-
-  const displayContent = displayAttachments.length
-    ? {
-        text: textToSend,
-        attachments: displayAttachments,
-        // Legacy fields keep older renderer/history paths working.
-        imageUrls: imageAttachments.map(entry => entry.url),
-        files: uploadedFiles,
-      }
-    : textToSend;
-
-  turn.messages.push({ role: 'user', content: apiContent, attachments: uploadedFiles });
-  turn.displayLog.push({ type: 'message', role: 'user', content: displayContent });
-  syncVisibleTurn(turn);
-  if (isTurnVisible(turn)) appendMessage('user', displayContent, turn.displayLog.length - 1);
-  await persistTurnConversation(turn);
-
-  await runAssistantTurnAndPersist(turn);
+  return sendMessageImpl(userText, chatFlowDeps());
 }
 
 // ── SSE helpers ───────────────────────────────────────────────────────────────
@@ -775,46 +441,6 @@ async function processSSEEvent(raw, ctx) {
   return true;
 }
 
-async function readResponseError(resp) {
-  const text = await resp.text().catch(() => '');
-  if (!text) return resp.statusText || `HTTP ${resp.status}`;
-
-  try {
-    const data = JSON.parse(text);
-    return data.error || text;
-  } catch {
-    return text;
-  }
-}
-
-/** Reads the SSE response body line-by-line, calling processSSEEvent for each data event. */
-async function readSSEStream(resp, ctx) {
-  if (!resp.body) throw new Error('Streaming response has no body.');
-  const reader  = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let   buffer  = '';
-
-  outer: while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    const lines = buffer.split('\n');
-    buffer = lines.pop(); // keep incomplete line
-
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const raw = line.slice(6).trim();
-      if (raw === '[DONE]') break outer;
-
-      try {
-        if (!await processSSEEvent(raw, ctx)) return false;
-      } catch { /* malformed SSE line — skip */ }
-    }
-  }
-  return true;
-}
-
 // ── SSE loop ──────────────────────────────────────────────────────────────────
 
 async function runChatLoop(turn) {
@@ -832,8 +458,6 @@ async function runChatLoop(turn) {
     turnAbortController = new AbortController();
 
     const resp = await api.stream('/api/chat/stream', {
-      api_base:  state.apiBase,
-      api_key:   state.apiKey,
       model:     state.model || 'gpt-4o',
       temperature:  state.temperature ?? 0.7,
       messages:              await buildApiMessages(turn.messages),
@@ -849,7 +473,7 @@ async function runChatLoop(turn) {
 
     if (!resp.ok) throw new Error(await readResponseError(resp));
 
-    const success = await readSSEStream(resp, ctx);
+    const success = await readSSEStream(resp, raw => processSSEEvent(raw, ctx));
     if (!success || turnCancelled) return;
 
     if (!ctx.assistantDone) finalizeAssistantAnswer(ctx);
@@ -863,104 +487,12 @@ async function runChatLoop(turn) {
   return ctx;
 }
 
-// ── Index helpers ────────────────────────────────────────────────────────────
-
-/** Maps a displayLog index to the corresponding state.messages index. */
-function logIndexToMessagesIndex(logIndex) {
-  let count = 0;
-  for (let i = 0; i < logIndex; i++) {
-    const entry = state.displayLog[i];
-    if (entry && (entry.type === 'message' || entry.type === 'tool_result')) count++;
-  }
-  return count;
-}
-
-// ── Edit & Resend ─────────────────────────────────────────────────────────────
-
-/**
- * Extract the image ref from a server image URL, e.g. "/api/images/<ref>" → "<ref>".
- * Returns null if the URL doesn't match the expected pattern.
- */
-function imageUrlToRef(url) {
-  const match = url && url.match(/\/api\/images\/([^/?#]+)/);
-  return match ? match[1] : null;
-}
+// Edit/resend and regenerate flows live in chat_edit.js.
 
 export async function editAndResend(logIndex, newText, imageUrls = [], files = [], attachments = null) {
-  if (state.isStreaming) return;
-
-  const normalizedAttachments = Array.isArray(attachments)
-    ? attachments
-    : [
-        ...(files || []).map(file => ({ kind: 'file', ...file })),
-        ...(imageUrls || []).map(url => ({ kind: 'image', url, ref: imageUrlToRef(url) })),
-      ];
-
-  if (!newText.trim() && !normalizedAttachments.length) return;
-  if (!state.convId) await createNewConversation();
-
-  const messagesIndex = logIndexToMessagesIndex(logIndex);
-  state.displayLog.splice(logIndex);
-  state.messages.splice(messagesIndex);
-  renderAllMessages(state.displayLog);
-
-  // Rebuild the user turn with the original attachments so they are preserved.
-  const textToSend = newText.trim();
-  const fileAttachments = normalizedAttachments.filter(entry => entry.kind === 'file');
-  const imageAttachments = normalizedAttachments.filter(entry => entry.kind === 'image');
-  const refs = imageAttachments.map(entry => entry.ref || imageUrlToRef(entry.url)).filter(Boolean);
-
-  let apiContent;
-  if (refs.length) {
-    apiContent = [];
-    if (textToSend) apiContent.push({ type: 'text', text: textToSend });
-    refs.forEach(ref => apiContent.push({ type: 'image_ref', ref }));
-  } else {
-    apiContent = textToSend;
-  }
-
-  const displayContent = normalizedAttachments.length
-    ? {
-        text: textToSend,
-        attachments: normalizedAttachments,
-        imageUrls: imageAttachments.map(entry => entry.url).filter(Boolean),
-        files: fileAttachments,
-      }
-    : textToSend;
-
-  const turn = createTurnContext(state.convId);
-  turn.messages.push({ role: 'user', content: apiContent, attachments: fileAttachments });
-  turn.displayLog.push({ type: 'message', role: 'user', content: displayContent });
-  syncVisibleTurn(turn);
-  if (isTurnVisible(turn)) appendMessage('user', displayContent, turn.displayLog.length - 1);
-  await persistTurnConversation(turn);
-
-  await runAssistantTurnAndPersist(turn);
+  return editAndResendImpl(logIndex, newText, imageUrls, files, attachments, chatFlowDeps());
 }
 
-// ── Regenerate ────────────────────────────────────────────────────────────────
-
 export async function regenerateFrom(logIndex) {
-  if (state.isStreaming) return;
-
-  // Walk back to find the index right after the last user message — that's
-  // where the whole assistant turn (thinking + tool calls + responses) begins.
-  let turnStart = 0;
-  for (let i = logIndex - 1; i >= 0; i--) {
-    const entry = state.displayLog[i];
-    if (entry.type === 'message' && entry.role === 'user') {
-      turnStart = i + 1;
-      break;
-    }
-  }
-
-  const messagesIndex = logIndexToMessagesIndex(turnStart);
-  state.displayLog.splice(turnStart);
-  state.messages.splice(messagesIndex);
-  renderAllMessages(state.displayLog);
-
-  if (!state.convId) return;
-  const turn = createTurnContext(state.convId);
-  await persistTurnConversation(turn);
-  await runAssistantTurnAndPersist(turn);
+  return regenerateFromImpl(logIndex, chatFlowDeps());
 }

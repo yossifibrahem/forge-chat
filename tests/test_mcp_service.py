@@ -27,6 +27,9 @@ def isolated_mcp_config(tmp_path, monkeypatch):
     """Point MCP_CONFIG_FILE at a writable temp path for every test."""
     config_path = tmp_path / "mcp.json"
     monkeypatch.setattr("mcp_service.MCP_CONFIG_FILE", config_path)
+    monkeypatch.setattr("mcp_service._config_cache", None)
+    monkeypatch.setattr("mcp_service._config_cache_at", 0.0)
+    monkeypatch.setattr("mcp_service._config_cache_path", None)
     return config_path
 
 
@@ -170,3 +173,128 @@ class TestRunAsync:
 
         with pytest.raises(ValueError, match="boom"):
             mcp_service.run_async(_failing())
+
+
+# ---------------------------------------------------------------------------
+# config cache
+# ---------------------------------------------------------------------------
+
+class TestConfigCache:
+
+    def test_load_config_uses_short_lived_cache(self, isolated_mcp_config, monkeypatch):
+        first = {"mcpServers": {"one": {"command": "a"}}}
+        second = {"mcpServers": {"two": {"command": "b"}}}
+        isolated_mcp_config.write_text(json.dumps(first))
+        monkeypatch.setattr("mcp_service._CONFIG_TTL_SECONDS", 60)
+
+        assert mcp_service.load_config() == first
+        isolated_mcp_config.write_text(json.dumps(second))
+        assert mcp_service.load_config() == first
+        assert mcp_service.load_config(refresh=True) == second
+
+
+# ---------------------------------------------------------------------------
+# McpSessionPool
+# ---------------------------------------------------------------------------
+
+class TestMcpSessionPool:
+
+    def _install_fake_mcp(self, monkeypatch):
+        import sys
+        import types
+        from types import SimpleNamespace
+
+        created_stdio = []
+        created_sessions = []
+
+        class FakeStdioContext:
+            def __init__(self, params):
+                self.params = params
+                self.entered = 0
+                self.exited = 0
+                created_stdio.append(self)
+
+            async def __aenter__(self):
+                self.entered += 1
+                return "reader", "writer"
+
+            async def __aexit__(self, exc_type, exc, tb):
+                self.exited += 1
+
+        class FakeClientSession:
+            def __init__(self, reader, writer):
+                self.reader = reader
+                self.writer = writer
+                self.entered = 0
+                self.exited = 0
+                self.initialized = 0
+                self.calls = []
+                created_sessions.append(self)
+
+            async def __aenter__(self):
+                self.entered += 1
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                self.exited += 1
+
+            async def initialize(self):
+                self.initialized += 1
+
+            async def call_tool(self, tool_name, arguments):
+                self.calls.append((tool_name, arguments))
+                return SimpleNamespace(content=[SimpleNamespace(text=f"{tool_name}:{arguments.get('n')}")])
+
+        def fake_stdio_client(params):
+            return FakeStdioContext(params)
+
+        mcp_module = types.ModuleType("mcp")
+        mcp_module.ClientSession = FakeClientSession
+        mcp_module.StdioServerParameters = lambda **kwargs: kwargs
+        mcp_client_module = types.ModuleType("mcp.client")
+        mcp_stdio_module = types.ModuleType("mcp.client.stdio")
+        mcp_stdio_module.stdio_client = fake_stdio_client
+
+        monkeypatch.setitem(sys.modules, "mcp", mcp_module)
+        monkeypatch.setitem(sys.modules, "mcp.client", mcp_client_module)
+        monkeypatch.setitem(sys.modules, "mcp.client.stdio", mcp_stdio_module)
+        monkeypatch.setattr(mcp_service, "_build_server_params", lambda name, cfg, conv_id="": {"server": name, "conv_id": conv_id})
+        return created_stdio, created_sessions
+
+    def test_reuses_one_session_for_repeated_calls_to_same_server(self, monkeypatch):
+        created_stdio, created_sessions = self._install_fake_mcp(monkeypatch)
+
+        pool = mcp_service.McpSessionPool(conv_id="conv-1")
+        try:
+            assert pool.invoke_tool("srv", {}, "tool", {"n": 1}) == "tool:1"
+            assert pool.invoke_tool("srv", {}, "tool", {"n": 2}) == "tool:2"
+        finally:
+            pool.close()
+
+        assert len(created_stdio) == 1
+        assert len(created_sessions) == 1
+        assert created_sessions[0].initialized == 1
+        assert created_sessions[0].calls == [("tool", {"n": 1}), ("tool", {"n": 2})]
+        assert created_sessions[0].exited == 1
+        assert created_stdio[0].exited == 1
+
+    def test_uses_separate_sessions_for_different_servers(self, monkeypatch):
+        created_stdio, created_sessions = self._install_fake_mcp(monkeypatch)
+
+        with mcp_service.McpSessionPool(conv_id="conv-1") as pool:
+            assert pool.invoke_tool("one", {}, "tool", {"n": 1}) == "tool:1"
+            assert pool.invoke_tool("two", {}, "tool", {"n": 2}) == "tool:2"
+
+        assert len(created_stdio) == 2
+        assert len(created_sessions) == 2
+        assert all(session.initialized == 1 for session in created_sessions)
+        assert all(session.exited == 1 for session in created_sessions)
+        assert all(stdio.exited == 1 for stdio in created_stdio)
+
+    def test_closed_pool_rejects_new_invocations(self, monkeypatch):
+        self._install_fake_mcp(monkeypatch)
+        pool = mcp_service.McpSessionPool(conv_id="conv-1")
+        pool.close()
+
+        with pytest.raises(RuntimeError, match="closed"):
+            pool.invoke_tool("srv", {}, "tool", {})

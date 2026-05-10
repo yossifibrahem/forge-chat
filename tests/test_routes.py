@@ -87,6 +87,27 @@ class TestUpdateConversation:
         assert resp.json["title"] == "new"
         assert resp.json["id"] == conv["id"]  # id must be preserved
 
+    def test_update_ignores_internal_field_overwrites(self, client, tmp_lumen):
+        conv = store.create("locked")
+        original_messages = [{"role": "user", "content": "safe"}]
+        store.save(conv["id"], {**conv, "messages": original_messages, "active_stream_id": "stream-1"})
+
+        resp = client.put(f"/api/conversations/{conv['id']}",
+                          json={
+                              "title": "renamed",
+                              "messages": [{"role": "assistant", "content": "hacked"}],
+                              "active_stream_id": "evil",
+                              "id": "changed",
+                          },
+                          content_type="application/json")
+
+        assert resp.status_code == 200
+        saved = store.load(conv["id"])
+        assert saved["id"] == conv["id"]
+        assert saved["title"] == "renamed"
+        assert saved["messages"] == original_messages
+        assert saved["active_stream_id"] == "stream-1"
+
 
 class TestDeleteConversation:
 

@@ -39,12 +39,12 @@ def stream_chat_completion(
     cancel_event: threading.Event,
     temperature: float = 0.7,
     timeout: float | None = None,
-) -> Generator[str, None, None]:
-    """Yield SSE strings for a streaming OpenAI chat completion.
+) -> Generator[dict, None, None]:
+    """Yield typed event dictionaries for a streaming OpenAI chat completion.
 
-    The cancel_event is checked before every yielded chunk.  When the
-    frontend calls POST /api/chat/cancel the event is set, the loop
-    breaks, and the stream is closed before [DONE] is flushed.
+    SSE serialization belongs at the HTTP boundary. Keeping this generator
+    dict-based avoids an internal encode/decode round-trip and makes tests
+    simpler. The cancel_event is checked before every yielded chunk.
     """
     openai_stream = None
     try:
@@ -73,10 +73,10 @@ def stream_chat_completion(
 
             reasoning = getattr(delta, 'reasoning_content', None)
             if reasoning:
-                yield sse_event({"type": "reasoning", "content": reasoning})
+                yield {"type": "reasoning", "content": reasoning}
 
             if delta.content:
-                yield sse_event({"type": "text", "content": delta.content})
+                yield {"type": "text", "content": delta.content}
 
             if delta.tool_calls:
                 for tc in delta.tool_calls:
@@ -85,16 +85,16 @@ def stream_chat_completion(
                     tool_name = accumulated_tool_calls[idx]["function"]["name"]
                     if idx not in announced_tool_indices and tool_name:
                         announced_tool_indices.add(idx)
-                        yield sse_event({"type": "tool_start", "name": tool_name})
+                        yield {"type": "tool_start", "name": tool_name}
 
             if chunk.choices and chunk.choices[0].finish_reason == "tool_calls":
-                yield sse_event({"type": "tool_calls", "calls": list(accumulated_tool_calls.values())})
+                yield {"type": "tool_calls", "calls": list(accumulated_tool_calls.values())}
 
-        yield "data: [DONE]\n\n"
+        yield {"type": "done"}
 
     except Exception as exc:
-        yield sse_event({"type": "error", "message": str(exc)})
-        yield "data: [DONE]\n\n"
+        yield {"type": "error", "message": str(exc)}
+        yield {"type": "done"}
 
 
 def make_streaming_response(generator: Generator) -> Response:

@@ -184,3 +184,41 @@ class TestListAll:
         (tmp_lumen["conv_dir"] / "corrupt.json").write_text("{{{bad")
         result = store.list_all()
         assert all("id" in r for r in result)
+
+    def test_concurrent_saves_keep_cached_index_consistent(self, tmp_lumen):
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # Prime the cache so each save updates the in-memory index rather than
+        # falling back to a later full rebuild. This is the race-prone path.
+        assert store.list_all() == []
+
+        def create_one(i: int) -> str:
+            return store.create(f"threaded-{i}")["id"]
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(create_one, i) for i in range(40)]
+            created_ids = {future.result() for future in as_completed(futures)}
+
+        listed_ids = {item["id"] for item in store.list_all()}
+        assert created_ids.issubset(listed_ids)
+
+    def test_index_mutators_acquire_lock(self, tmp_lumen, monkeypatch):
+        class RecordingLock:
+            def __init__(self):
+                self.entries = 0
+
+            def __enter__(self):
+                self.entries += 1
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        lock = RecordingLock()
+        monkeypatch.setattr(store, "_index_lock", lock)
+        monkeypatch.setattr(store, "_index", [])
+
+        store._update_index_for("conv-1", {"title": "One"})
+        store._remove_index_entry("conv-1")
+        store._rebuild_index()
+
+        assert lock.entries == 3

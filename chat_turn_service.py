@@ -9,6 +9,7 @@ from collections.abc import Callable
 
 from openai import OpenAI
 
+import app_config
 from mcp_adapters import ContainerConversationRequired
 import container_service
 import mcp_service
@@ -73,10 +74,11 @@ _SET_TITLE_TOOL = {
 }
 
 
-def openai_client(body: dict) -> OpenAI:
+def openai_client(body: dict | None = None) -> OpenAI:
+    cfg = app_config.load_config()
     return OpenAI(
-        api_key=body.get("api_key") or "sk-placeholder",
-        base_url=body.get("api_base") or "https://api.openai.com/v1",
+        api_key=cfg.get("api_key") or "sk-placeholder",
+        base_url=cfg.get("api_base") or app_config.DEFAULT_API_BASE,
     )
 
 
@@ -137,7 +139,17 @@ def _generate_title(body: dict, messages: list) -> str | None:
         return None
 
 
-def _parse_stream_payload(raw_event: str) -> dict | None:
+def _parse_stream_payload(raw_event) -> dict | None:
+    """Normalize a streaming event.
+
+    streaming.stream_chat_completion now yields typed dicts internally. This
+    helper keeps backwards compatibility with older tests/callers that still
+    pass SSE strings.
+    """
+    if isinstance(raw_event, dict):
+        return raw_event
+    if not isinstance(raw_event, str):
+        return None
     raw_event = raw_event.strip()
     if not raw_event.startswith("data: "):
         return None
@@ -205,7 +217,7 @@ def _safe_tool_args(raw_args: str) -> dict:
         return {}
 
 
-def _run_mcp_call(conv_id: str, tool_meta: dict, call: dict) -> tuple[dict, str]:
+def _run_mcp_call(conv_id: str, tool_meta: dict, call: dict, session_pool=None) -> tuple[dict, str]:
     name = call.get("function", {}).get("name", "")
     args = _safe_tool_args(call.get("function", {}).get("arguments", "{}"))
     server_name = tool_meta.get("server", "")
@@ -213,15 +225,18 @@ def _run_mcp_call(conv_id: str, tool_meta: dict, call: dict) -> tuple[dict, str]
     if not server_config:
         return args, f"Error calling tool '{name}': MCP server '{server_name}' not found"
     try:
-        result = mcp_service.run_async(
-            mcp_service.invoke_tool(
-                server_name,
-                server_config,
-                name,
-                args,
-                conv_id=conv_id,
+        if session_pool is not None:
+            result = session_pool.invoke_tool(server_name, server_config, name, args)
+        else:
+            result = mcp_service.run_async(
+                mcp_service.invoke_tool(
+                    server_name,
+                    server_config,
+                    name,
+                    args,
+                    conv_id=conv_id,
+                )
             )
-        )
     except ContainerConversationRequired as exc:
         result = str(exc)
     except Exception as exc:
@@ -270,6 +285,7 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
     is_first_message = len([m for m in turn_messages if m.get("role") == "user"]) == 1
     recorder = TurnRecorder(conv_id, title, turn_messages, stream_id)
     assistant_completed = False
+    session_pool = None
 
     def finalize_partial_answer(reasoning: str, text: str) -> bool:
         nonlocal assistant_completed
@@ -297,6 +313,9 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
             if server_names:
                 extra_volumes = mcp_service.collect_all_extra_volumes(server_names)
                 container_service.ensure_container(conv_id, extra_volumes)
+
+        if conv_id and tool_meta:
+            session_pool = mcp_service.McpSessionPool(conv_id)
 
         while not cancel_event.is_set():
             acc_text = ""
@@ -376,7 +395,7 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
                     # server auto-approves the call and no approval UI is shown.
                     publish({"type": "tool_running", "name": name, "args": args_preview})
 
-                    args, result = _run_mcp_call(conv_id, meta, call)
+                    args, result = _run_mcp_call(conv_id, meta, call, session_pool)
                     # displayName is intentionally omitted here — the JS adapter system
                     # (tool_adapters/) is the single source of truth for display labels.
                     # Each adapter declares a `labelArg` (default: 'description') that
@@ -412,3 +431,6 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
     except Exception as exc:
         publish({"type": "error", "message": str(exc)})
         recorder.finalize(display_log)
+    finally:
+        if session_pool is not None:
+            session_pool.close()

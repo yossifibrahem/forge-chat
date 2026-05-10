@@ -22,10 +22,13 @@ import streaming
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _parse_events(raw_events: list[str]) -> list[dict]:
-    """Convert raw SSE strings to parsed dicts, turning [DONE] into {"type": "done"}."""
+def _parse_events(raw_events: list[dict | str]) -> list[dict]:
+    """Normalize typed stream events, with backwards support for SSE strings."""
     events = []
     for raw in raw_events:
+        if isinstance(raw, dict):
+            events.append(raw)
+            continue
         raw = raw.strip()
         if not raw.startswith("data:"):
             continue
