@@ -6,7 +6,7 @@ import { isServerEnabled, isServerAutoApprove } from './mcp.js';
 import { buildMcpSystemPrompt as buildMcpPrompt } from './mcp_policy.js';
 
 function namespacedToolName(tool) {
-  return `${tool.server}__${tool.name}`;
+  return `${tool.server}_${tool.name}`;
 }
 
 export function buildToolsPayload() {

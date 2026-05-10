@@ -179,11 +179,11 @@ def _tool_meta_by_name(body: dict) -> dict:
 
 
 def _bare_tool_name(name: str, meta: dict | None = None) -> str:
-    """Strip the server__ namespace prefix, using originalName from meta if available."""
+    """Strip the server_ namespace prefix, using originalName from meta if available."""
     if meta and meta.get("originalName"):
         return meta["originalName"]
-    if "__" in name:
-        return name.split("__", 1)[1]
+    if "_" in name:
+        return name.split("_", 1)[1]
     return name
 
 

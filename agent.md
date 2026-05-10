@@ -13,7 +13,7 @@ Lumen is a self-hosted Flask chat UI for OpenAI-compatible chat-completions APIs
 - Per-conversation workspace directories mounted as `/workspace`
 - Docker sandbox containers per conversation
 - MCP server configuration through `mcp.json` and the UI
-- MCP tool discovery, tool-call execution, approval/deny UI, and tool-result rendering
+- MCP tool discovery, namespaced model-facing tool names, tool-call execution, approval/deny UI, and tool-result rendering
 - Per-turn MCP stdio session reuse through `McpSessionPool`
 - Image uploads stored by content hash
 - Regular file uploads stored in the conversation workspace
@@ -278,6 +278,7 @@ Do not restore the old internal SSE encode/decode round-trip. Keep stream intern
 - `collect_all_extra_volumes()` gathers the union of host mount volumes for a list of server names.
 - `fetch_tools()` returns OpenAI-tool-like metadata for the frontend.
 - `invoke_tool()` remains available for one-off calls.
+- MCP config cache reads/writes are protected by a lock because Flask can run threaded.
 - `run_async()` bridges async MCP calls into Flask sync route/service code.
 
 #### `McpSessionPool`
@@ -444,6 +445,8 @@ Do not assume they have the same indices. Use helper mapping logic when editing/
 
 `mcp_tool_ui.js` and `tool_adapters/` control how tool calls/results are displayed. To add rich rendering for a new MCP tool, prefer adding a tool adapter rather than special-casing in `renderer.js`.
 
+Tool names sent to the model are namespaced as `server_tool` in `chat_payloads.js` to prevent collisions when multiple enabled MCP servers expose the same bare tool name. Keep tool descriptions clean and semantic (`tool.description || tool.name`); do not prepend `[server]` labels to model-facing descriptions because the namespace is already encoded in the function name. For UI and MCP dispatch, `chat_turn_service._bare_tool_name()` strips the namespace or uses `originalName` from metadata. If display and dispatch behavior ever need to diverge, split the helper at that point with a clear comment explaining why.
+
 Existing adapters:
 
 - `bash.js`: shell/command tools
@@ -531,7 +534,7 @@ Run `pytest` from the project root. Current expected status:
 
 ```bash
 pytest
-# 268 passed
+# 266 passed
 ```
 
 Tests are isolated: `conftest.py` redirects filesystem paths to `tmp_path`, patches Docker startup checks in the app factory, and stubs container cleanup where needed. No Docker daemon, real API key, or running server is required for the unit/integration-style tests.
@@ -612,9 +615,9 @@ Short-term deployment default: one worker with threads, as in `gunicorn.conf.py`
 
 Long-term fix: move cancellation and stream event delivery to Redis/pub-sub or another shared backend.
 
-### 2. Tool-name collisions across MCP servers
+### 2. MCP tool names are model-facing namespaces
 
-OpenAI tool names are currently just `tool.name`, while tool metadata maps by `name` only. If two enabled MCP servers expose the same tool name, metadata lookup may collide. A future-safe design would namespace tool names or track call-to-server mapping more explicitly.
+MCP tool names sent to the API are intentionally namespaced as `server_tool` so duplicate bare tool names from different enabled servers cannot collide. The metadata payload keeps both the namespaced `name` and bare `originalName`, and `chat_turn_service._bare_tool_name()` is the single helper used to recover the bare MCP tool name for UI display and server dispatch. Keep descriptions unprefixed; server labels belong in UI grouping, not in the model-facing `description` field.
 
 ### 3. No authentication/user accounts
 

@@ -215,6 +215,8 @@ These files are not stored in the project repository unless you manually copy th
 
 MCP servers are stored in `mcp.json` in the project root. The UI can read and write this file through the MCP settings panel.
 
+Model-facing tool names are namespaced as `server_tool` so two enabled MCP servers can expose the same bare tool name without colliding. The namespace is kept in the API tool name, while tool descriptions stay clean and semantic instead of being prefixed with server labels. The UI still groups tools by server for readability.
+
 All MCP servers run inside the conversation's Docker sandbox container, with the workspace mounted at `/workspace`. Example `mcp.json`:
 
 ```json
@@ -291,7 +293,7 @@ Workspace paths are normalized to `/workspace/...` for safe tool and sandbox usa
 7. Ask the assistant to use one of the tools.
 8. Approve or deny the tool call when prompted, unless auto-approval is enabled for that server.
 
-Tool activity is shown inline in the chat, including tool names, arguments, status, and results. All tool execution happens inside the conversation's Docker container with the workspace mounted at `/workspace`.
+Tool activity is shown inline in the chat, including bare tool names, arguments, status, and results. Internally, API tool names use the `server_tool` namespace and are stripped back to the bare MCP tool name for display and dispatch. All tool execution happens inside the conversation's Docker container with the workspace mounted at `/workspace`.
 
 ### Cancel a streaming response
 
