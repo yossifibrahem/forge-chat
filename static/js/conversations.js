@@ -251,12 +251,8 @@ export async function deleteConversation(convId) {
   if (!confirm('Delete this conversation?')) return;
   await api.delete(`/api/conversations/${convId}`);
   if (state.convId === convId) {
-    state.convId     = null;
-    state.messages   = [];
-    state.displayLog = [];
-    storage.remove(STORAGE_KEYS.lastConv);
-    clearMessages();
-    resetFilePanel();
+    // Reset the UI to an empty chat so the header/title clears.
+    startNewChat();
   }
   await loadConversationList();
 }
