@@ -305,60 +305,19 @@ Use the UI customization controls to change theme, accent color, font size, time
 
 ## 🧪 Running tests
 
-This repository does not currently include a full automated test suite. A good first step is to add `pytest` and test the Flask routes with Flask's built-in test client.
-
 Install test dependencies:
 
 ```bash
-pip install pytest pytest-flask
+pip install -r requirements-dev.txt
 ```
 
-Create a `tests/` directory:
+Run the full test suite:
 
 ```bash
-mkdir -p tests
+pytest
 ```
 
-Example starter test:
-
-```python
-# tests/test_routes.py
-import pytest
-from app import create_app
-
-
-@pytest.fixture
-def client():
-    app = create_app()
-    app.config["TESTING"] = True
-    with app.test_client() as client:
-        yield client
-
-
-def test_index_loads(client):
-    response = client.get("/")
-    assert response.status_code == 200
-
-
-def test_conversations_endpoint_returns_list(client):
-    response = client.get("/api/conversations")
-    assert response.status_code == 200
-    assert isinstance(response.get_json(), list)
-```
-
-Run tests:
-
-```bash
-pytest -v
-```
-
-Recommended future coverage areas:
-
-- Conversation CRUD in `store.py`
-- Workspace path normalization and traversal protection in `workspace_service.py`
-- MCP config validation and tool discovery behavior
-- SSE stream event formatting and cancellation behavior
-- Route-level error handling for missing conversations, invalid paths, and upload limits
+The test suite covers store, workspace service, chat turn service, streaming, MCP service, MCP adapters, container service, and Flask HTTP routes. Tests are isolated using temporary filesystem paths and do not require Docker or an API key.
 
 Manual smoke test checklist before opening a pull request:
 
@@ -402,9 +361,9 @@ git checkout -b feature/your-change
 
 Before submitting a pull request:
 
+- All automated tests pass (`pytest`)
 - Explain what changed and why.
 - Include manual test steps and results.
-- Add or update automated tests when practical.
 - Keep unrelated formatting changes out of functional PRs.
 - Confirm the app still starts locally.
 - Confirm no secrets, API keys, conversation data, or local workspace files are committed.
@@ -427,35 +386,4 @@ When reporting a bug, include:
 ## 📄 License
 
 This project is released under the MIT License.
-
-If a `LICENSE` file is present in the repository, that file is the authoritative license text. If it is not present, add one before publishing or distributing the project publicly.
-
-Suggested `LICENSE` file contents:
-
-```text
-MIT License
-
-Copyright (c) 2026 Lumen AI Chat contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
 Built for people who like local control, readable code, and AI tools that do not require a 14-step deployment ritual.
