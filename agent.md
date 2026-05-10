@@ -128,6 +128,7 @@ LUMEN_CONTAINER_MEMORY    default: 512m
 LUMEN_CONTAINER_CPUS      default: 1
 LUMEN_CONTAINER_NETWORK   default: bridge
 LUMEN_CONTAINER_PREFIX    default: lumen-chat-
+LUMEN_CONTAINER_IDLE_TIMEOUT default: 1800 (seconds; 0 disables idle reaping)
 LUMEN_MAX_FILE_PREVIEW_BYTES default: 512 KiB
 LUMEN_MAX_FILE_LIST_ENTRIES  default: 500
 LUMEN_MAX_UPLOAD_BYTES       default: 50 MiB
@@ -261,6 +262,7 @@ Covered by tests: no-`conv_id` discovery, discovery start/stop/reuse, skipped-se
 - Containers are started with `/workspace` mounted to the host workspace.
 - The sandbox drops all capabilities, then adds back a minimal set: `CHOWN`, `DAC_OVERRIDE`, `SETUID`, `SETGID`.
 - Provides stale container cleanup, container removal, workspace deletion, status inspection, and `docker exec` command wrapping.
+- **Idle reaper**: a daemon thread stops conversation containers that have been idle beyond `LUMEN_CONTAINER_IDLE_TIMEOUT` (default 1800 s / 30 min). Activity is tracked via `_touch(conv_id)`, called automatically from `ensure_container()` and `wrap_command_for_exec()`. The reaper uses `stop_container_process()` (soft stop, not removal), so the container can be restarted instantly on next use. Set `LUMEN_CONTAINER_IDLE_TIMEOUT=0` to disable. The MCP discovery container is explicitly excluded from reaping.
 
 The Docker container command is `sleep infinity`, so it stays alive for later `docker exec` MCP calls.
 
@@ -448,11 +450,11 @@ Follow the existing separation of concerns:
 
 ## Automated test suite
 
-Run `pytest` from the project root. All 245 tests must pass before merging any change.
+Run `pytest` from the project root. All 255 tests must pass before merging any change.
 
 ```bash
 pytest
-# 245 passed in ~3s
+# 255 passed in ~3s
 ```
 
 Tests are isolated: `conftest.py` redirects all filesystem paths to `tmp_path`, patches `_require_docker` and `_require_sandbox_image` in the app factory, and stubs `container_service.cleanup_stale`. No Docker daemon, real API key, or running server is needed.
@@ -467,7 +469,7 @@ Tests are isolated: `conftest.py` redirects all filesystem paths to `tmp_path`, 
 | `test_streaming.py` | SSE event ordering, multi-delta tool name accumulation, parallel tool calls, cancellation closes stream, errors produce error+done events |
 | `test_mcp_service.py` | Config load/save/roundtrip, malformed-config handling, atomic writes, `run_async` exception propagation |
 | `test_mcp_adapters.py` | `apply_workspace_process_options` param mutation, `find_project_root` depth limit (prevents mounting `/home`/`/`), `extract_host_mounts` deduplication and `:ro` flag |
-| `test_container_service.py` | `_safe_id` character sanitisation (shell-safety), `wrap_command_for_exec` argv and env ordering, `_is_name_conflict` race detection |
+| `test_container_service.py` | `_safe_id` character sanitisation (shell-safety), `wrap_command_for_exec` argv and env ordering, `_is_name_conflict` race detection, `_touch` timestamp recording, `_reap_once` idle stop/skip/discovery-exclusion/disable |
 | `test_routes.py` | All HTTP routes via Flask test client, including 400/404/413 error paths |
 
 ## Manual verification checklist

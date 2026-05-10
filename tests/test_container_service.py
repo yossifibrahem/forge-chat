@@ -208,6 +208,120 @@ class TestVolumeArgs:
 
 
 # ---------------------------------------------------------------------------
+# Idle reaper
+# ---------------------------------------------------------------------------
+
+class TestTouch:
+    def test_touch_records_conv_id(self):
+        import time
+        container_service._last_used.clear()
+        before = time.monotonic()
+        container_service._touch("conv-abc")
+        after = time.monotonic()
+        assert "conv-abc" in container_service._last_used
+        assert before <= container_service._last_used["conv-abc"] <= after
+
+    def test_touch_updates_existing_entry(self):
+        container_service._last_used["conv-abc"] = 0.0
+        container_service._touch("conv-abc")
+        assert container_service._last_used["conv-abc"] > 0.0
+
+    def test_multiple_convs_tracked_independently(self):
+        container_service._last_used.clear()
+        container_service._touch("conv-1")
+        container_service._touch("conv-2")
+        assert "conv-1" in container_service._last_used
+        assert "conv-2" in container_service._last_used
+
+
+class TestReapOnce:
+    def setup_method(self):
+        container_service._last_used.clear()
+
+    def test_stops_idle_running_container(self, monkeypatch):
+        stopped = []
+        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
+        monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
+
+        container_service._last_used["old-conv"] = 0.0   # very old
+        container_service._reap_once()
+
+        assert "old-conv" in stopped
+
+    def test_removes_reaped_entry_from_last_used(self, monkeypatch):
+        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
+        monkeypatch.setattr(container_service, "stop_container_process", lambda cid: None)
+
+        container_service._last_used["old-conv"] = 0.0
+        container_service._reap_once()
+
+        assert "old-conv" not in container_service._last_used
+
+    def test_skips_non_idle_container(self, monkeypatch):
+        import time
+        stopped = []
+        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
+        monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
+
+        container_service._last_used["fresh-conv"] = time.monotonic()  # just touched
+        container_service._reap_once()
+
+        assert "fresh-conv" not in stopped
+        assert "fresh-conv" in container_service._last_used   # entry kept
+
+    def test_skips_already_stopped_container(self, monkeypatch):
+        stopped = []
+        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service, "get_status", lambda cid: "stopped")
+        monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
+
+        container_service._last_used["idle-conv"] = 0.0
+        container_service._reap_once()
+
+        assert stopped == []                              # stop_container_process not called
+        assert "idle-conv" not in container_service._last_used   # entry still cleaned up
+
+    def test_skips_discovery_container(self, monkeypatch):
+        stopped = []
+        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
+        monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
+
+        container_service._last_used[container_service.DISCOVERY_CONTAINER_ID] = 0.0
+        container_service._reap_once()
+
+        assert container_service.DISCOVERY_CONTAINER_ID not in stopped
+
+    def test_disabled_when_idle_timeout_zero(self, monkeypatch):
+        stopped = []
+        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 0)
+        monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
+        monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
+
+        container_service._last_used["old-conv"] = 0.0
+        container_service._reap_once()
+
+        assert stopped == []
+
+    def test_only_reaps_idle_not_fresh(self, monkeypatch):
+        import time
+        stopped = []
+        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
+        monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
+
+        container_service._last_used["old-conv"] = 0.0
+        container_service._last_used["fresh-conv"] = time.monotonic()
+        container_service._reap_once()
+
+        assert stopped == ["old-conv"]
+        assert "fresh-conv" in container_service._last_used
+
+
+# ---------------------------------------------------------------------------
 # discovery container cleanup protection
 # ---------------------------------------------------------------------------
 

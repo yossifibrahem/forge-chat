@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Literal
@@ -22,11 +23,18 @@ CONTAINER_CPUS = os.getenv("LUMEN_CONTAINER_CPUS", "1")
 CONTAINER_NETWORK = os.getenv("LUMEN_CONTAINER_NETWORK", "bridge")
 CONTAINER_PREFIX = os.getenv("LUMEN_CONTAINER_PREFIX", "lumen-chat-")
 DISCOVERY_CONTAINER_ID = "__mcp_discovery__"
+# Seconds of inactivity before a conversation container is stopped.
+# Set to 0 to disable idle reaping entirely.
+IDLE_TIMEOUT = int(os.getenv("LUMEN_CONTAINER_IDLE_TIMEOUT", "1800"))  # default 30 min
 
 ContainerStatus = Literal["running", "stopped", "missing"]
 
 _CONTAINER_LOCKS: dict[str, threading.Lock] = {}
 _CONTAINER_LOCKS_GUARD = threading.Lock()
+
+# Last-activity timestamps for idle reaping (conv_id → monotonic seconds).
+_last_used: dict[str, float] = {}
+_last_used_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -90,6 +98,7 @@ def get_status(conv_id: str) -> ContainerStatus:
 
 def ensure_container(conv_id: str, extra_volumes: list[str] | None = None) -> ContainerInfo:
     """Create/start the chat container, safely serialized per conversation."""
+    _touch(conv_id)
     with _container_lock(conv_id):
         return _ensure_container_locked(conv_id, extra_volumes or [])
 
@@ -229,6 +238,7 @@ def wrap_command_for_exec(
     env: Mapping[str, str] | None = None,
 ) -> tuple[str, list[str]]:
     """Return a docker-exec stdio command for an MCP server process."""
+    _touch(conv_id)
     docker_args = ["exec", "-i", "--workdir", "/workspace"]
     for key, value in (env or {}).items():
         docker_args += ["--env", f"{key}={value}"]
@@ -248,3 +258,54 @@ def delete_workspace(conv_id: str) -> None:
         raise RuntimeError(f"Refusing to delete non-directory workspace: {path}")
     shutil.rmtree(path)
     log.info("[container] deleted workspace %s", path)
+
+
+# ---------------------------------------------------------------------------
+# Idle reaper
+# ---------------------------------------------------------------------------
+
+def _touch(conv_id: str) -> None:
+    """Record that conv_id was just active, resetting its idle clock."""
+    with _last_used_lock:
+        _last_used[conv_id] = time.monotonic()
+
+
+def _reap_once() -> None:
+    """Stop every conversation container that has been idle beyond IDLE_TIMEOUT.
+
+    The discovery container is intentionally excluded — it is already managed
+    by stop_container_process() in the /api/mcp/tools route.
+    """
+    if IDLE_TIMEOUT <= 0:
+        return
+    now = time.monotonic()
+    with _last_used_lock:
+        candidates = [
+            cid for cid, ts in _last_used.items()
+            if cid != DISCOVERY_CONTAINER_ID and now - ts > IDLE_TIMEOUT
+        ]
+    for conv_id in candidates:
+        if get_status(conv_id) == "running":
+            log.info("[container] idle timeout reached for %s; stopping", conv_id)
+            stop_container_process(conv_id)
+        with _last_used_lock:
+            _last_used.pop(conv_id, None)
+
+
+def _reap_idle_containers() -> None:
+    """Background daemon loop: check for idle containers every 60 seconds."""
+    while True:
+        time.sleep(60)
+        try:
+            _reap_once()
+        except Exception:
+            log.exception("[container] error in idle reaper")
+
+
+# Daemon thread — exits automatically when the main process exits.
+_reaper_thread = threading.Thread(
+    target=_reap_idle_containers,
+    name="container-idle-reaper",
+    daemon=True,
+)
+_reaper_thread.start()
