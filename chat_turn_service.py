@@ -10,6 +10,7 @@ from collections.abc import Callable
 from openai import OpenAI
 
 from mcp_adapters import ContainerConversationRequired
+import container_service
 import mcp_service
 import store
 import streaming as stream_module
@@ -285,6 +286,18 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
     recorder.save(display_log, force=True)
 
     try:
+        # Pre-mount host volumes for every enabled MCP server before the turn
+        # begins. Without this, the container is set up lazily per-server and
+        # gets recreated each time the model switches to a server whose host
+        # path isn't yet mounted.
+        if conv_id and body.get("mcp_tool_meta"):
+            server_names = list({
+                t.get("server", "") for t in body["mcp_tool_meta"] if t.get("server")
+            })
+            if server_names:
+                extra_volumes = mcp_service.collect_all_extra_volumes(server_names)
+                container_service.ensure_container(conv_id, extra_volumes)
+
         while not cancel_event.is_set():
             acc_text = ""
             acc_reasoning = ""

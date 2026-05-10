@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-from mcp_adapters import apply_workspace_process_options, expand_config_env
+from mcp_adapters import apply_workspace_process_options, expand_config_env, extract_host_mounts
 
 MCP_CONFIG_FILE = Path("mcp.json")
 log = logging.getLogger(__name__)
@@ -43,6 +43,25 @@ def save_config(config: dict) -> None:
 
 def find_server(server_name: str) -> dict | None:
     return load_config().get("mcpServers", {}).get(server_name)
+
+
+def collect_all_extra_volumes(server_names: list[str]) -> list[str]:
+    """Return the union of host mount volumes needed by all given MCP servers.
+
+    Called once at turn start so the container is created with every required
+    volume upfront, preventing recreation mid-turn when the model switches
+    between servers that reference different host paths.
+    """
+    servers = load_config().get("mcpServers", {})
+    seen: set[str] = set()
+    volumes: list[str] = []
+    for name in server_names:
+        for spec in extract_host_mounts(servers.get(name, {})):
+            src = spec.split(":", 1)[0]
+            if src not in seen:
+                seen.add(src)
+                volumes.append(spec)
+    return volumes
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
