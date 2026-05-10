@@ -5,7 +5,7 @@ export function buildMcpSystemPrompt({ tools = [], isServerEnabled = () => true 
   const enabledTools = tools.filter(tool => isServerEnabled(tool.server));
   if (!enabledTools.length) return '';
 
-  const toolNames = enabledTools.map(tool => `${tool.server}.${tool.name}`).join(', ');
+  const toolNames = enabledTools.map(tool => `${tool.server}__${tool.name}`).join(', ');
   return [
     'MCP tools are available in this chat: ' + toolNames + '.',
     'MCP servers run inside this chat\'s Docker container. Tools use WORKING_DIR/PWD=/workspace, persisted on the host at ~/.lumen/containers/<chat_id>. Prefer relative paths like README.md or src/app.py unless the server documentation says otherwise. Keep commands scoped to the active workspace.',

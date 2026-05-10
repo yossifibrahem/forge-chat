@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 _config_cache: dict | None = None
 _config_cache_at = 0.0
 _config_cache_path: Path | None = None
+_config_cache_lock = threading.Lock()
 _CONFIG_TTL_SECONDS = float(os.getenv("LUMEN_MCP_CONFIG_CACHE_TTL", "5"))
 
 
@@ -28,30 +29,31 @@ _CONFIG_TTL_SECONDS = float(os.getenv("LUMEN_MCP_CONFIG_CACHE_TTL", "5"))
 def load_config(*, refresh: bool = False) -> dict:
     global _config_cache, _config_cache_at, _config_cache_path
     now = time.monotonic()
-    if (
-        not refresh
-        and _config_cache is not None
-        and _config_cache_path == MCP_CONFIG_FILE
-        and now - _config_cache_at < _CONFIG_TTL_SECONDS
-    ):
-        return _config_cache
+    with _config_cache_lock:
+        if (
+            not refresh
+            and _config_cache is not None
+            and _config_cache_path == MCP_CONFIG_FILE
+            and now - _config_cache_at < _CONFIG_TTL_SECONDS
+        ):
+            return _config_cache
 
-    if not MCP_CONFIG_FILE.exists():
-        _config_cache = {"mcpServers": {}}
+        if not MCP_CONFIG_FILE.exists():
+            _config_cache = {"mcpServers": {}}
+            _config_cache_at = now
+            _config_cache_path = MCP_CONFIG_FILE
+            return _config_cache
+        try:
+            config = json.loads(MCP_CONFIG_FILE.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            log.warning("[mcp] could not read %s: %s", MCP_CONFIG_FILE, exc)
+            config = {"mcpServers": {}}
+        if not isinstance(config, dict) or not isinstance(config.get("mcpServers", {}), dict):
+            config = {"mcpServers": {}}
+        _config_cache = config
         _config_cache_at = now
         _config_cache_path = MCP_CONFIG_FILE
-        return _config_cache
-    try:
-        config = json.loads(MCP_CONFIG_FILE.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
-        log.warning("[mcp] could not read %s: %s", MCP_CONFIG_FILE, exc)
-        config = {"mcpServers": {}}
-    if not isinstance(config, dict) or not isinstance(config.get("mcpServers", {}), dict):
-        config = {"mcpServers": {}}
-    _config_cache = config
-    _config_cache_at = now
-    _config_cache_path = MCP_CONFIG_FILE
-    return config
+        return config
 
 
 def save_config(config: dict) -> None:
@@ -64,10 +66,11 @@ def save_config(config: dict) -> None:
 
     tmp_path = MCP_CONFIG_FILE.with_suffix(f".tmp-{uuid.uuid4().hex}")
     tmp_path.write_text(json.dumps(config, indent=2))
-    tmp_path.replace(MCP_CONFIG_FILE)
-    _config_cache = config
-    _config_cache_at = time.monotonic()
-    _config_cache_path = MCP_CONFIG_FILE
+    with _config_cache_lock:
+        tmp_path.replace(MCP_CONFIG_FILE)
+        _config_cache = config
+        _config_cache_at = time.monotonic()
+        _config_cache_path = MCP_CONFIG_FILE
 
 
 def find_server(server_name: str) -> dict | None:

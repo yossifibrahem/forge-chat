@@ -6,7 +6,7 @@ by the streaming integration tests. Everything tested here is a pure function
 or a thin stateful helper that does not touch the network.
 
 Functions under test:
-  _parse_stream_payload   — critical SSE-string → dict bridge
+  _parse_stream_payload   — typed dict event passthrough
   _messages_to_text       — title-generation input formatter
   _extract_title          — 3-path title extractor (tool_calls / XML)
   _safe_tool_args         — silent JSON parser for tool arguments
@@ -30,36 +30,22 @@ import chat_turn_service as svc
 # ---------------------------------------------------------------------------
 
 class TestParseStreamPayload:
-    """
-    This function bridges streaming.py output back into dicts for the turn
-    loop. All four paths must behave correctly or the entire chat loop breaks.
-    """
+    """Streaming internals are dict-based; SSE encoding happens only in routes.py."""
 
-    def test_valid_json_data_line(self):
-        result = svc._parse_stream_payload('data: {"type": "text", "content": "hi"}')
-        assert result == {"type": "text", "content": "hi"}
+    def test_dict_event_is_returned(self):
+        payload = {"type": "text", "content": "hi"}
+        assert svc._parse_stream_payload(payload) is payload
 
-    def test_done_sentinel_returns_done_type(self):
-        result = svc._parse_stream_payload("data: [DONE]")
-        assert result == {"type": "done"}
+    def test_done_dict_is_returned(self):
+        payload = {"type": "done"}
+        assert svc._parse_stream_payload(payload) is payload
 
-    def test_non_data_line_returns_none(self):
-        # Lines that don't start with "data:" must be silently ignored
-        assert svc._parse_stream_payload("event: ping") is None
-        assert svc._parse_stream_payload("") is None
-        assert svc._parse_stream_payload(": heartbeat") is None
+    def test_sse_string_is_ignored(self):
+        assert svc._parse_stream_payload('data: {"type": "text", "content": "hi"}') is None
 
-    def test_malformed_json_after_data_prefix_returns_none(self):
-        assert svc._parse_stream_payload("data: {not valid json") is None
-
-    def test_leading_whitespace_stripped(self):
-        result = svc._parse_stream_payload('  data: {"type": "text", "content": "x"}')
-        assert result == {"type": "text", "content": "x"}
-
-    def test_preserves_nested_payload(self):
-        payload = {"type": "tool_calls", "calls": [{"id": "c1", "function": {"name": "bash"}}]}
-        raw = f"data: {json.dumps(payload)}"
-        assert svc._parse_stream_payload(raw) == payload
+    def test_non_dict_is_ignored(self):
+        assert svc._parse_stream_payload(None) is None
+        assert svc._parse_stream_payload(123) is None
 
 
 # ---------------------------------------------------------------------------

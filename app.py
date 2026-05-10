@@ -42,6 +42,7 @@ def create_app() -> Flask:
     ]
     CORS(app, origins=allowed_origins)
     app.register_blueprint(blueprint)
+    container_service.start_reaper()
     _cleanup_stale_containers()
     _register_shutdown_cleanup()
     return app

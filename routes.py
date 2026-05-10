@@ -114,7 +114,9 @@ def get_container_status(conv_id: str):
 def update_conversation(conv_id: str):
     allowed_fields = {"title", "system_prompt"}
     body = _body()
-    data = store.load(conv_id) or {"id": conv_id}
+    data = store.load(conv_id)
+    if data is None:
+        return jsonify({"error": "Not found"}), 404
     for key in allowed_fields:
         if key in body:
             data[key] = body[key]

@@ -29,7 +29,6 @@ _SAFE_IMAGE_EXTENSIONS = {'png', 'jpeg', 'webp', 'gif'}
 _SAFE_NAME = re.compile(r'^[a-f0-9]{64}\.(png|jpeg|webp|gif)$')
 
 _index: list[dict] | None = None
-_index_dir: Path | None = None
 _index_lock = threading.RLock()
 
 
@@ -45,8 +44,14 @@ def _conversation_summary(path: Path) -> dict | None:
         return None
 
 
+def invalidate_index() -> None:
+    global _index
+    with _index_lock:
+        _index = None
+
+
 def _rebuild_index() -> None:
-    global _index, _index_dir
+    global _index
     with _index_lock:
         summaries = []
         for path in sorted(CONVERSATIONS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
@@ -54,7 +59,6 @@ def _rebuild_index() -> None:
             if summary:
                 summaries.append(summary)
         _index = summaries
-        _index_dir = CONVERSATIONS_DIR
 
 
 def _update_index_for(conv_id: str, data: dict) -> None:
@@ -123,7 +127,7 @@ def working_directory(conv_id: str) -> Path:
 def list_all() -> list[dict]:
     """Return cached conversation summaries sorted by most-recently modified."""
     with _index_lock:
-        if _index is None or _index_dir != CONVERSATIONS_DIR:
+        if _index is None:
             _rebuild_index()
         return list(_index or [])
 

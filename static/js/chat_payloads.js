@@ -5,6 +5,9 @@ import { state } from './state.js';
 import { isServerEnabled, isServerAutoApprove } from './mcp.js';
 import { buildMcpSystemPrompt as buildMcpPrompt } from './mcp_policy.js';
 
+function namespacedToolName(tool) {
+  return `${tool.server}__${tool.name}`;
+}
 
 export function buildToolsPayload() {
   return state.mcpTools
@@ -12,8 +15,8 @@ export function buildToolsPayload() {
     .map(tool => ({
       type: 'function',
       function: {
-        name:        tool.name,
-        description: tool.description,
+        name:        namespacedToolName(tool),
+        description: tool.description || tool.name,
         parameters:  tool.inputSchema || { type: 'object', properties: {} },
       },
     }));
@@ -23,19 +26,26 @@ export function buildMcpToolMetaPayload() {
   return state.mcpTools
     .filter(tool => isServerEnabled(tool.server))
     .map(tool => ({
-      name: tool.name,
+      name: namespacedToolName(tool),
+      originalName: tool.name,
       server: tool.server,
       autoApprove: isServerAutoApprove(tool.server),
     }));
 }
 
 /** Fetch a server-stored image and return it as a base64 data-URL. */
+const imageDataUrlCache = new Map();
+
 async function imageRefToDataUrl(ref) {
+  if (imageDataUrlCache.has(ref)) return imageDataUrlCache.get(ref);
   const resp = await fetch(`/api/images/${ref}`);
   const blob = await resp.blob();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload  = () => resolve(reader.result);
+    reader.onload  = () => {
+      imageDataUrlCache.set(ref, reader.result);
+      resolve(reader.result);
+    };
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });

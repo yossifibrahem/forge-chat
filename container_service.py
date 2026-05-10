@@ -339,10 +339,23 @@ def _reap_idle_containers() -> None:
             log.exception("[container] error in idle reaper")
 
 
-# Daemon thread — exits automatically when the main process exits.
-_reaper_thread = threading.Thread(
-    target=_reap_idle_containers,
-    name="container-idle-reaper",
-    daemon=True,
-)
-_reaper_thread.start()
+# Daemon thread — exits automatically when the main process exits. It is
+# started explicitly from app.create_app() so tests can import this module
+# without spawning background threads.
+_reaper_thread: threading.Thread | None = None
+_reaper_started = False
+_reaper_lock = threading.Lock()
+
+
+def start_reaper() -> None:
+    global _reaper_thread, _reaper_started
+    with _reaper_lock:
+        if _reaper_started:
+            return
+        _reaper_thread = threading.Thread(
+            target=_reap_idle_containers,
+            name="container-idle-reaper",
+            daemon=True,
+        )
+        _reaper_thread.start()
+        _reaper_started = True

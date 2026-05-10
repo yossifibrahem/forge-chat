@@ -38,6 +38,9 @@ def tmp_lumen(tmp_path, monkeypatch):
     monkeypatch.setattr("store.IMAGES_DIR", images_dir)
     monkeypatch.setattr("container_service.CONTAINERS_ROOT", containers_dir)
 
+    import store
+    store.invalidate_index()
+
     return {
         "conv_dir": conv_dir,
         "images_dir": images_dir,
