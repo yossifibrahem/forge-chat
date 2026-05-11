@@ -1,7 +1,7 @@
 /* Floating input dock, toolbar, model picker, suggestions, and composer attachments. */
 
-/* ─── Floating Input Dock ──────────────────────────────────────────────────── */
-#input-area {
+/* ─── Floating Composer ────────────────────────────────────────────────────── */
+#composer-area {
   position: absolute;
   bottom: 24px;
   left: 50%;
@@ -9,34 +9,38 @@
   width: min(var(--dock-w), calc(100% - 40px));
   z-index: 20;
   animation: dockSlideIn .35s var(--ease) both;
-  background: var(--bg);
-  border-radius: 16px;
-  padding-bottom: 4px;
 }
 
 /* Centered mode: new conversation */
-#main.is-empty #input-area {
+#main.is-empty #composer-area {
   top: 50%;
   bottom: auto;
   transform: translateX(-50%) translateY(-50%);
   animation: centerFadeIn .35s var(--ease) both;
 }
 
-/* The dock card itself */
-.input-dock {
+/* The composer dock holds the rounded input panel and the attached disclaimer. */
+#composer-dock {
+  filter: drop-shadow(0 18px 40px rgba(0,0,0,.16));
+}
+
+#composer-input-panel {
+  position: relative;
+  z-index: 1;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: var(--shadow);
   transition: border-color var(--fast);
+  overflow: hidden;
 }
 
 #image-preview-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 8px 8px 8px 8px;
+  padding: 10px 10px 0;
 }
+
 
 #user-input {
   width: 100%;
@@ -198,12 +202,17 @@
   font-size: .62rem;
 }
 .input-disclaimer {
-  margin: 6px 0 0;
+  margin: -1px 10px 0;
+  padding: 8px 12px;
   text-align: center;
   color: var(--text3);
   font-size: .65rem;
   font-family: var(--font-mono);
   letter-spacing: .2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
 }
 
 /* ─── Suggestions bar ─────────────────────────────────────────────────────── */

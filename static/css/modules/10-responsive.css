@@ -12,8 +12,8 @@
   #main { margin-left: 0 !important; }
   #chat-header { height: calc(50px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 12px 0; gap: 8px; }
   #chat-title-input { font-size: .82rem; }
-  #input-area { bottom: env(safe-area-inset-bottom, 12px); width: calc(100% - 24px); }
-  #main.is-empty #input-area { transform: translateX(-50%) translateY(-50%); }
+  #composer-area { bottom: env(safe-area-inset-bottom, 12px); width: calc(100% - 24px); }
+  #main.is-empty #composer-area { transform: translateX(-50%) translateY(-50%); }
   .msg-row { padding: 12px 14px 4px; }
   .msg-row:first-child { padding-top: 18px; }
   .msg-content { font-size: .875rem; }

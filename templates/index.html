@@ -144,51 +144,54 @@
 
   <div id="messages"></div>
 
-  <!-- Floating Input Dock -->
-  <div id="input-area">
-    <div id="image-preview-bar" hidden></div>
+  <!-- Floating Composer -->
+  <div id="composer-area">
+    <div id="composer-dock">
+      <div id="composer-input-panel">
+        <div id="image-preview-bar" hidden></div>
 
-    <div class="input-dock">
-      <textarea id="user-input" rows="1" placeholder="Ask anything…"></textarea>
+        <textarea id="user-input" rows="1" placeholder="Ask anything…"></textarea>
 
-      <div class="input-toolbar">
-        <div class="toolbar-left">
-          <button id="attach-btn" title="Attach files or images">
-            <span data-icon="plus"></span>
-          </button>
-          <input type="file" id="attachment-input" multiple hidden />
-
-          <button id="mic-btn" title="Voice input">
-            <span data-icon="mic"></span>
-          </button>
-
-          <div id="model-picker-wrap">
-            <button id="model-badge" title="Click to change model">
-              <span id="model-badge-label">No model</span>
-              <span id="model-badge-chevron" data-icon="chevronDown"></span>
+        <div class="input-toolbar">
+          <div class="toolbar-left">
+            <button id="attach-btn" title="Attach files or images">
+              <span data-icon="plus"></span>
             </button>
-            <div id="model-popover">
-              <div class="mp-header">Select model</div>
-              <div id="mp-model-list"><span class="mp-empty">No models — fetch them in Settings</span></div>
+            <input type="file" id="attachment-input" multiple hidden />
+
+            <button id="mic-btn" title="Voice input">
+              <span data-icon="mic"></span>
+            </button>
+
+            <div id="model-picker-wrap">
+              <button id="model-badge" title="Click to change model">
+                <span id="model-badge-label">No model</span>
+                <span id="model-badge-chevron" data-icon="chevronDown"></span>
+              </button>
+              <div id="model-popover">
+                <div class="mp-header">Select model</div>
+                <div id="mp-model-list"><span class="mp-empty">No models — fetch them in Settings</span></div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="toolbar-right">
-          <span class="char-count" id="char-count"></span>
-          <span class="input-hint">⏎ send · ⇧⏎ newline</span>
-          <button id="send-btn" title="Send (Enter)">
-            <span data-icon="send"></span>
-          </button>
-          <button id="stop-btn" title="Stop generation" hidden>
-            <span data-icon="stop"></span>
-          </button>
+          <div class="toolbar-right">
+            <span class="char-count" id="char-count"></span>
+            <span class="input-hint">⏎ send · ⇧⏎ newline</span>
+            <button id="send-btn" title="Send (Enter)">
+              <span data-icon="send"></span>
+            </button>
+            <button id="stop-btn" title="Stop generation" hidden>
+              <span data-icon="stop"></span>
+            </button>
+          </div>
         </div>
       </div>
+
+      <p class="input-disclaimer">Lumen AI can make mistakes.</p>
     </div>
 
     <!-- Suggestion chips shown in new-conversation state -->
-    <p class="input-disclaimer">Lumen AI can make mistakes.</p>
     <div id="suggestions-bar"></div>
   </div>
 </main>
@@ -533,7 +536,7 @@
           <div id="mcp-status" class="status-msg"></div>
           <div id="tool-list">
             <div class="no-tools-label">No tools loaded</div>
-          </div>
+            </div>
         </div>
       </div>
 
