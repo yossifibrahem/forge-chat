@@ -31,7 +31,7 @@
   border: 1px solid var(--border);
   border-radius: 14px;
   transition: border-color var(--fast);
-  overflow: hidden;
+  overflow: visible;
 }
 
 #image-preview-bar {
