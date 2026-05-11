@@ -20,6 +20,31 @@ The project intentionally avoids a frontend build pipeline. The UI is served dir
 
 ---
 
+## 📷 Screen shots
+<img width="1470" height="836" alt="new chat" src="https://github.com/user-attachments/assets/8c8040eb-56f1-4f37-a331-9eddaa560294" />
+<center>New Chat screen with familiar layout</center>
+<img width="1470" height="836" alt="latex" src="https://github.com/user-attachments/assets/e474ab80-6009-422d-ab5c-d83dd923e53e" />
+<center>Math latex and conversation managment</center>
+<img width="1470" height="836" alt="image upload" src="https://github.com/user-attachments/assets/71b706e1-3ec6-4f2e-bdbd-145e9dcff9fb" />
+<center>Image upload</center>
+<img width="1470" height="836" alt="file upload" src="https://github.com/user-attachments/assets/c910ca2d-bf5d-471c-930d-d46b23e2790a" />
+<center>File upload to the tools container</center>
+<img width="1470" height="836" alt="workspace container" src="https://github.com/user-attachments/assets/d46dcc44-7366-449b-8986-376b1f37a210" />
+<center>Per chat container and workspace</center>
+<img width="1470" height="836" alt="tool approve" src="https://github.com/user-attachments/assets/4a5f7412-80ac-4f8b-8eb6-302bcc096282" />
+<center>Tool approval</center>
+<img width="1470" height="836" alt="api settings" src="https://github.com/user-attachments/assets/c941a553-c3ab-4ff2-991c-e3a6e89a2dbe" />
+<center>API settings</center>
+<img width="1470" height="836" alt="chat settings" src="https://github.com/user-attachments/assets/15a74efb-9fe7-40c8-affe-c1764a72016f" />
+<center>Chat settings</center>
+<img width="1470" height="836" alt="appearance settings" src="https://github.com/user-attachments/assets/d1cee8ef-9934-4ee3-88b5-47eb3abf28fb" />
+<center>appearance settings</center>
+<img width="1470" height="836" alt="mcp settings" src="https://github.com/user-attachments/assets/027d0196-b1b4-4b4f-9020-824ac73346c5" />
+<center>MCP settings</center>
+
+
+---
+
 ## ✨ Features
 
 - **OpenAI-compatible model support**  
