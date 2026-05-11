@@ -13,9 +13,9 @@ export { getToolDisplayLabel } from './mcp_tool_ui.js';
 
 function getToolIconSvg(toolName) {
   const tool = state.mcpTools.find(t => t.name === toolName);
-  if (!tool) return ICONS.plug;
-  const iconKey = state.mcpServerSettings[tool.server]?.icon || 'plug';
-  return ICONS[iconKey] || ICONS.plug;
+  if (!tool) return ICONS.tabMcp;
+  const iconKey = state.mcpServerSettings[tool.server]?.icon || 'tabMcp';
+  return ICONS[iconKey] || ICONS.tabMcp;
 }
 
 const SUGGESTION_CHIPS = [

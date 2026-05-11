@@ -309,11 +309,11 @@ Container runtime:
 
 ### MCP discovery container
 
-`/api/mcp/tools` can run without an open conversation. When `conv_id` is missing, it uses the reusable `__mcp_discovery__` container, lists MCP tools, then stops it for idle reuse.
+`/api/mcp/tools` can run without an open conversation. When `conv_id` is missing, it uses the reusable `mcp-discovery` container, lists MCP tools, then stops it for idle reuse.
 
 Keep this behavior intact:
 
-- Stale-container cleanup must skip `__mcp_discovery__`.
+- Stale-container cleanup must skip `mcp-discovery`.
 - Real chat tool discovery/calls must still use the actual conversation `conv_id`.
 - Remote MCP servers may log harmless shutdown noise when discovery stops the container after tools load.
 

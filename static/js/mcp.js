@@ -19,10 +19,10 @@ function saveServerSettings() {
 
 function getServerSetting(serverName) {
   if (!state.mcpServerSettings[serverName]) {
-    state.mcpServerSettings[serverName] = { enabled: true, autoApprove: false, icon: 'plug' };
+    state.mcpServerSettings[serverName] = { enabled: true, autoApprove: false, icon: 'tabMcp' };
   }
   if (!state.mcpServerSettings[serverName].icon) {
-    state.mcpServerSettings[serverName].icon = 'plug';
+    state.mcpServerSettings[serverName].icon = 'tabMcp';
   }
   return state.mcpServerSettings[serverName];
 }
@@ -173,7 +173,7 @@ function buildIconPickerHtml(server, currentIconKey) {
     <div class="server-icon-wrap" data-server="${escapeHtml(server)}">
       <button class="server-icon-btn" data-server="${escapeHtml(server)}"
               title="Change server icon" aria-label="Change server icon">
-        <span class="server-icon-current">${ICONS[currentIconKey] || ICONS.plug}</span>
+        <span class="server-icon-current">${ICONS[currentIconKey] || ICONS.tabMcp}</span>
       </button>
       <div class="icon-picker-dropdown" style="display:none">
         ${optionsHtml}
@@ -183,7 +183,7 @@ function buildIconPickerHtml(server, currentIconKey) {
 
 function buildServerGroupHtml(server, tools, settings) {
   const disabledCls   = settings.enabled ? '' : ' server-disabled';
-  const currentIcon   = settings.icon || 'plug';
+  const currentIcon   = settings.icon || 'tabMcp';
   const toolsHtml     = tools.map(tool => `
     <div class="tool-card">
       <div class="tool-card-header">

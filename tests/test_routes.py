@@ -421,15 +421,15 @@ class TestMcpToolsDiscoveryRoutes:
             "inputSchema": {},
         }]
         ensure_container.assert_called_once_with(
-            "__mcp_discovery__",
+            "mcp-discovery",
             extra_volumes=[],
         )
         fetch_tools.assert_called_once_with(
             "fs",
             config["mcpServers"]["fs"],
-            conv_id="__mcp_discovery__",
+            conv_id="mcp-discovery",
         )
-        stop_container_process.assert_called_once_with("__mcp_discovery__")
+        stop_container_process.assert_called_once_with("mcp-discovery")
 
     def test_no_conversation_mounts_deduplicated_discovery_volumes(self, client, tmp_lumen):
         config = {
@@ -459,7 +459,7 @@ class TestMcpToolsDiscoveryRoutes:
 
         assert resp.status_code == 200
         ensure_container.assert_called_once_with(
-            "__mcp_discovery__",
+            "mcp-discovery",
             extra_volumes=[
                 "/host/shared:/host/shared:ro",
                 "/host/unique:/host/unique:ro",
@@ -521,4 +521,4 @@ class TestMcpToolsDiscoveryRoutes:
             "tools": [],
             "skipped": [{"server": "remote", "reason": "needs a conversation"}],
         }
-        stop_container_process.assert_called_once_with("__mcp_discovery__")
+        stop_container_process.assert_called_once_with("mcp-discovery")

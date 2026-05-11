@@ -47,7 +47,6 @@ export const ICONS = {
 
   // ── Decorative / small ─────────────────────────────────────────────────────
   bulb:   icon('<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12c0 1.5.5 2 1 3h6c.5-1 1-1.5 1-3a7 7 0 0 0-4-12z"/>', 'width="13" height="13"'),
-  plug: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="10" width="10" height="7" rx="1"/><line x1="10" y1="10" x2="10" y2="6"/><line x1="14" y1="10" x2="14" y2="6"/><line x1="12" y1="17" x2="12" y2="20"/></svg>`,
   layers: icon('<polygon points="12 2 22 8.5 12 15 2 8.5"/><polyline points="2 13 12 19.5 22 13"/><polyline points="2 17.5 12 24 22 17.5"/>', 'width="13" height="13"'),
 
   // ── Suggestion chip icons (sized by CSS) ───────────────────────────────────
