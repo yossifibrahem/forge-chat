@@ -163,6 +163,9 @@
   left: 0;
   z-index: 200;
   width: 260px;
+  max-height: min(420px, calc(100dvh - 96px));
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border2);
@@ -177,11 +180,27 @@
 #model-popover.open { opacity: 1; pointer-events: all; transform: none; }
 .mp-header { padding: 10px 12px 7px; border-bottom: 1px solid var(--border); color: var(--text3); font-size: .63rem; text-transform: uppercase; letter-spacing: .8px; }
 #mp-model-list, .model-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
-#mp-model-list { max-height: 240px; padding: 6px; }
+#mp-model-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 360px;
+  padding: 6px;
+}
 .mp-chip, .model-chip { color: var(--text2); cursor: pointer; }
-.mp-chip { padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; font-size: .73rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-chip {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: .73rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .mp-chip:hover { background: var(--surface2); color: var(--text); }
-:is(.mp-chip, .model-chip).selected { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-border-mid); }
+:is(.mp-chip, .model-chip).selected { background: var(--accent-dim); color: var(--accent);}
 .mp-empty { display: block; padding: 10px; color: var(--text3); font-size: .7rem; text-align: center; }
 
 /* ─── Send / stop buttons ─────────────────────────────────────────────────── */
