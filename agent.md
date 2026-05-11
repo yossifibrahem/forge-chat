@@ -133,6 +133,7 @@ The backend stores user data outside the repo by default:
 ```text
 ~/.lumen/
 ├── config.json       # server-side API provider config, unless LUMEN_CONFIG_FILE overrides it
+├── mcp.json          # MCP server config, unless LUMEN_MCP_CONFIG_FILE overrides it
 ├── conversations/    # one JSON file per conversation
 ├── containers/       # one workspace directory per conversation
 └── images/           # uploaded images keyed by SHA-256 hash
@@ -145,6 +146,8 @@ OPENAI_API_KEY              overrides saved API key
 OPENAI_BASE_URL             overrides saved API base URL
 OPENAI_API_BASE             fallback alias for API base URL
 LUMEN_CONFIG_FILE           path to server-side config JSON
+LUMEN_CONFIG_CACHE_TTL      default: 5 seconds
+LUMEN_MCP_CONFIG_FILE       path to MCP config JSON; default ~/.lumen/mcp.json
 LUMEN_SANDBOX_IMAGE         default: lumen-sandbox
 LUMEN_CONTAINERS_ROOT       default: ~/.lumen/containers
 LUMEN_CONTAINER_MEMORY      default: 512m
@@ -152,6 +155,8 @@ LUMEN_CONTAINER_CPUS        default: 1
 LUMEN_CONTAINER_NETWORK     default: bridge
 LUMEN_CONTAINER_PREFIX      default: lumen-chat-
 LUMEN_CONTAINER_IDLE_TIMEOUT default: 1800 seconds; 0 disables idle reaping
+LUMEN_MAX_CONTENT_LENGTH    default: 60 MiB Flask request body cap
+LUMEN_CORS_ORIGINS          default: http://localhost:8080,http://127.0.0.1:8080
 LUMEN_MAX_FILE_PREVIEW_BYTES default: 512 KiB
 LUMEN_MAX_FILE_LIST_ENTRIES  default: 500
 LUMEN_MAX_UPLOAD_BYTES       default: 50 MiB
@@ -165,8 +170,8 @@ Browser `localStorage` keys such as `lumen_settings`, `lumen_models`, and `lumen
 ### `app.py`
 
 - Creates the Flask app.
-- Sets `MAX_CONTENT_LENGTH` to cap request body size globally.
-- Configures CORS to localhost origins by default.
+- Sets `MAX_CONTENT_LENGTH` from `LUMEN_MAX_CONTENT_LENGTH` to cap request body size globally.
+- Configures CORS from `LUMEN_CORS_ORIGINS`, defaulting to localhost origins.
 - Verifies Docker and the sandbox image at startup.
 - Registers the single blueprint from `routes.py`.
 - Calls stale container cleanup at startup.
@@ -270,7 +275,7 @@ Do not restore the old internal SSE encode/decode round-trip. Keep stream intern
 
 ### `mcp_service.py`
 
-- Persists `mcp.json` in the project root.
+- Persists MCP config at `~/.lumen/mcp.json` by default; `LUMEN_MCP_CONFIG_FILE` can override the path.
 - Caches MCP config for a short TTL to avoid reading `mcp.json` on every tool call.
 - Validates only the top-level config shape: `{"mcpServers": {...}}`.
 - Connects to each MCP server through stdio.
@@ -530,11 +535,10 @@ Follow the existing separation of concerns:
 
 ## Automated test suite
 
-Run `pytest` from the project root. Current expected status:
+Run `pytest` from the project root. The exact collected test count can change as the suite evolves, so do not hardcode a pass count in docs; the expected status is a clean passing run with no collection errors or failures.
 
 ```bash
 pytest
-# 266 passed
 ```
 
 Tests are isolated: `conftest.py` redirects filesystem paths to `tmp_path`, patches Docker startup checks in the app factory, and stubs container cleanup where needed. No Docker daemon, real API key, or running server is required for the unit/integration-style tests.

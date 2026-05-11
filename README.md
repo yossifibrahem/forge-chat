@@ -144,10 +144,10 @@ python app.py
 For a more production-like deployment, run the Flask app behind a WSGI server such as Gunicorn:
 
 ```bash
-gunicorn -w 4 -b 0.0.0.0:8080 "app:create_app()"
+gunicorn -c gunicorn.conf.py "app:create_app()"
 ```
 
-> Note: active streaming state is stored in process memory. If you use multiple Gunicorn workers, stream reattachment and cancellation state may not be shared across workers.
+> Note: active streaming state is stored in process memory. Keep Gunicorn to one worker, as defined in `gunicorn.conf.py`; use threads for concurrency until cancellation and replay state move to shared storage.
 
 ---
 
@@ -179,12 +179,22 @@ Lumen reads the following environment variables at runtime:
 
 | Variable | Default | Description |
 | --- | --- | --- |
+| `OPENAI_API_KEY` | unset | Overrides the saved server-side API key |
+| `OPENAI_BASE_URL` | unset | Overrides the saved API base URL |
+| `OPENAI_API_BASE` | unset | Fallback alias for `OPENAI_BASE_URL` |
+| `LUMEN_CONFIG_FILE` | `~/.lumen/config.json` | Server-side API provider config path |
+| `LUMEN_CONFIG_CACHE_TTL` | `5` | Seconds to cache server-side API config reads |
+| `LUMEN_MCP_CONFIG_FILE` | `~/.lumen/mcp.json` | MCP server config path |
+| `LUMEN_MCP_CONFIG_CACHE_TTL` | `5` | Seconds to cache MCP config reads |
 | `LUMEN_SANDBOX_IMAGE` | `lumen-sandbox` | Docker image used for sandbox containers |
 | `LUMEN_CONTAINERS_ROOT` | `~/.lumen/containers` | Host directory for per-conversation workspaces |
 | `LUMEN_CONTAINER_MEMORY` | `512m` | Docker memory limit per sandbox container |
 | `LUMEN_CONTAINER_CPUS` | `1` | Docker CPU quota per sandbox container |
 | `LUMEN_CONTAINER_NETWORK` | `bridge` | Docker network mode for sandbox containers |
 | `LUMEN_CONTAINER_PREFIX` | `lumen-chat-` | Prefix used for generated container names |
+| `LUMEN_CONTAINER_IDLE_TIMEOUT` | `1800` | Seconds before idle conversation containers are stopped; `0` disables idle reaping |
+| `LUMEN_MAX_CONTENT_LENGTH` | `62914560` | Flask request body cap in bytes |
+| `LUMEN_CORS_ORIGINS` | `http://localhost:8080,http://127.0.0.1:8080` | Comma-separated allowed browser origins |
 | `LUMEN_MAX_FILE_PREVIEW_BYTES` | `524288` | Maximum size for text file previews in the UI |
 | `LUMEN_MAX_FILE_LIST_ENTRIES` | `500` | Maximum number of entries returned when listing a workspace directory |
 | `LUMEN_MAX_UPLOAD_BYTES` | `52428800` | Maximum file upload size in bytes |
@@ -204,6 +214,8 @@ By default, runtime data is stored under the current user's home directory:
 
 ```text
 ~/.lumen/
+├── config.json      # Server-side API provider config, unless LUMEN_CONFIG_FILE overrides it
+├── mcp.json         # MCP server config, unless LUMEN_MCP_CONFIG_FILE overrides it
 ├── conversations/   # Conversation JSON files
 ├── containers/      # Per-conversation workspace directories
 └── images/          # Uploaded images keyed by SHA-256 hash
@@ -213,11 +225,11 @@ These files are not stored in the project repository unless you manually copy th
 
 ### MCP configuration
 
-MCP servers are stored in `mcp.json` in the project root. The UI can read and write this file through the MCP settings panel.
+MCP servers are stored in `~/.lumen/mcp.json` by default. Set `LUMEN_MCP_CONFIG_FILE` to use another path. The UI can read and write this file through the MCP settings panel.
 
 Model-facing tool names are namespaced as `server_tool` so two enabled MCP servers can expose the same bare tool name without colliding. The namespace is kept in the API tool name, while tool descriptions stay clean and semantic instead of being prefixed with server labels. The UI still groups tools by server for readability.
 
-All MCP servers run inside the conversation's Docker sandbox container, with the workspace mounted at `/workspace`. Example `mcp.json`:
+All MCP servers run inside the conversation's Docker sandbox container, with the workspace mounted at `/workspace`. Tool discovery can use a reusable `__mcp_discovery__` container when no conversation is open. Example `mcp.json`:
 
 ```json
 {
@@ -293,7 +305,7 @@ Workspace paths are normalized to `/workspace/...` for safe tool and sandbox usa
 7. Ask the assistant to use one of the tools.
 8. Approve or deny the tool call when prompted, unless auto-approval is enabled for that server.
 
-Tool activity is shown inline in the chat, including bare tool names, arguments, status, and results. Internally, API tool names use the `server_tool` namespace and are stripped back to the bare MCP tool name for display and dispatch. All tool execution happens inside the conversation's Docker container with the workspace mounted at `/workspace`.
+Tool activity is shown inline in the chat, including bare tool names, arguments, status, and results. Internally, API tool names use the `server_tool` namespace and are stripped back to the bare MCP tool name for display and dispatch. During a chat turn, MCP stdio sessions are reused through a per-turn session pool, then closed at the end of the turn. All tool execution happens inside the conversation's Docker container with the workspace mounted at `/workspace`.
 
 ### Cancel a streaming response
 
