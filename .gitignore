@@ -3,3 +3,4 @@ conversations
 mcp.json
 __pycache__
 .venv
+test.md
