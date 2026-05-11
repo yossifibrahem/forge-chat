@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from mcp_adapters import apply_workspace_process_options, expand_config_env, extract_host_mounts
+from docker_path_utils import parse_volume_source
 
 _MCP_CONFIG_DIR = Path.home() / ".lumen"
 _MCP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -91,7 +92,9 @@ def collect_all_extra_volumes(server_names: list[str]) -> list[str]:
     volumes: list[str] = []
     for name in server_names:
         for spec in extract_host_mounts(servers.get(name, {})):
-            src = spec.split(":", 1)[0]
+            # Use container_service's parser so Windows drive-letter sources
+            # like "D:/foo/bar" are extracted correctly (not just "D").
+            src = parse_volume_source(spec)
             if src not in seen:
                 seen.add(src)
                 volumes.append(spec)

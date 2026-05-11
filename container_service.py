@@ -69,8 +69,11 @@ def _run(args: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(args, capture_output=True, text=True)
 
 
-def _volume_source(spec: str) -> str:
-    return spec.split(":", 1)[0]
+from docker_path_utils import parse_volume_source
+
+# Internal alias kept so the rest of this module can call _volume_source
+# without knowing about docker_path_utils.
+_volume_source = parse_volume_source
 
 
 def _get_mounted_sources(name: str) -> set[str]:

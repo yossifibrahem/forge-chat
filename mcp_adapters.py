@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import container_service
+from docker_path_utils import make_volume_spec, translate_arg_for_container
 
 log = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ def _apply_container(
     command, args = container_service.wrap_command_for_exec(
         conv_id,
         params["command"],
-        params.get("args", []),
+        [translate_arg_for_container(a) for a in params.get("args", [])],
         env=container_env,
     )
     params["command"] = command
@@ -101,7 +102,7 @@ def extract_host_mounts(server_config: dict) -> list[str]:
         src = str(mount_src)
         if src not in seen:
             seen.add(src)
-            volumes.append(f"{src}:{src}:ro")
+            volumes.append(make_volume_spec(src))
 
     return volumes
 
