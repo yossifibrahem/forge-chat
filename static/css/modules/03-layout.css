@@ -39,7 +39,9 @@
 #messages {
   flex: 1;
   overflow-y: auto;
-  padding: 0 0 180px;
+  /* Keep the last message comfortably above the floating composer,
+     including when the composer has attachment previews. */
+  padding: 0 0 300px;
   scroll-behavior: smooth;
 }
 
