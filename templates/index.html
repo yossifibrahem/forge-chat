@@ -55,9 +55,11 @@
     if (prefs.showTimestamps === false)        r.classList.add('hide-timestamps');
     if (prefs.showSuggestionChips === false)   r.classList.add('hide-suggestion-chips');
 
-    // Sidebar — collapse immediately if default is closed.
-    // Read sidebarDefaultOpen; default is true, so only act when explicitly false.
-    if (prefs.sidebarDefaultOpen === false) {
+    // Sidebar — collapse immediately when the last saved state is closed.
+    // On first visit, default to open on desktop and closed on mobile.
+    var sidebarSaved = localStorage.getItem('lumen_sidebar');
+    var sidebarOpen = sidebarSaved === null ? !isMobile : sidebarSaved === 'true';
+    if (!sidebarOpen) {
       r.classList.add('sidebar-init-closed');
     }
 
@@ -445,17 +447,6 @@
 
         <div class="settings-section">
           <div class="section-title">Interface</div>
-
-          <div class="cust-row">
-            <div class="cust-row-label">
-              <span class="cust-label">Sidebar open by default</span>
-              <span class="cust-hint">Start with the conversation sidebar visible</span>
-            </div>
-            <label class="cust-toggle">
-              <input type="checkbox" id="cust-sidebar-open" />
-              <span class="cust-toggle-track"><span class="cust-toggle-thumb"></span></span>
-            </label>
-          </div>
 
           <div class="cust-row">
             <div class="cust-row-label">

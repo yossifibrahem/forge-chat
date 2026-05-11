@@ -13,7 +13,6 @@ export const SETTINGS_DEFAULTS = {
 };
 
 export const CUSTOMIZATION_DEFAULTS = {
-  sidebarDefaultOpen:    true,
   showSuggestionChips:   true,
   showTimestamps:        true,
   blocksDefaultExpanded:  false,
@@ -33,6 +32,7 @@ export const STORAGE_KEYS = {
   models:            'lumen_models',
   lastConv:          'lumen_last_conv',
   sidebar:           'lumen_sidebar',
+  filePanelOpen:     'lumen_file_panel_open',
   customization:     'lumen_customization',
 };
 

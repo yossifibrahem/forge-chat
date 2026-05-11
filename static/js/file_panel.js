@@ -1,10 +1,11 @@
 // Workspace file panel — browse files inside the per-chat /workspace.
 
 import { api } from './api.js';
-import { state } from './state.js';
+import { STORAGE_KEYS, state } from './state.js';
 import { ICONS } from './icons.js';
 import { applyMarkdown, codeFenceFor } from './markdown.js';
 import { showToast } from './ui.js';
+import { storage } from './storage.js';
 import { escapeHtml, formatBytes, fileExtension as ext } from './format.js';
 
 const PANEL_WIDTH_KEY = 'lumen_file_panel_width';
@@ -82,8 +83,9 @@ function isMissingWorkspacePath(error = '') {
   return ['Path not found', 'File not found', 'Path is not a file'].includes(error);
 }
 
-function setPanelOpen(open) {
+function setPanelOpen(open, { persist = true } = {}) {
   isOpen = open;
+  if (persist) storage.set(STORAGE_KEYS.filePanelOpen, open);
   const { panel, toggle } = els();
   panel?.classList.toggle('open', open);
   toggle?.classList.toggle('active', open);
@@ -301,14 +303,14 @@ export async function refreshFilePanel({ keepPreview = true } = {}) {
 export function resetFilePanel() {
   currentPath = '/workspace';
   closePreview();
-  // Keep the panel closed by default; load files only after the user opens it.
+  // Preserve the open/closed panel state; only reset path and preview for the new chat.
 }
 
 
 export function initFilePanel() {
   const { toggle, close, refresh, previewRefresh, previewClose, back, copy, download } = els();
   initPanelResize();
-  setPanelOpen(isOpen);
+  setPanelOpen(storage.get(STORAGE_KEYS.filePanelOpen, false), { persist: false });
   setEmptyPreview();
   setPreviewOpen(false);
 
@@ -343,7 +345,5 @@ export function initFilePanel() {
     link.click();
     link.remove();
   });
-
-  // Keep the panel closed by default; load files only after the user opens it.
 }
 
