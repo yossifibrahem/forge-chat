@@ -110,29 +110,44 @@ function renderMarkdown(text) {
   return DOMPurify.sanitize(html, PURIFY_CONFIG);
 }
 
-export function applyMarkdown(el, text) {
+function longestRun(text, char) {
+  return Math.max(0, ...[...String(text || '').matchAll(new RegExp(`${char}+`, 'g'))].map(match => match[0].length));
+}
+
+export function codeFenceFor(content, language = '') {
+  const fence = '~'.repeat(Math.max(3, longestRun(content, '~') + 1));
+  const lang = String(language || '').replace(/[^\w#+.-]/g, '');
+  return `${fence}${lang}\n${content || ''}\n${fence}`;
+}
+
+function addCodeCopyButton(block) {
+  const btn = document.createElement('button');
+  btn.className = 'code-copy';
+  btn.type = 'button';
+  btn.innerHTML = ICONS.copy;
+  btn.title = 'Copy code';
+  btn.setAttribute('aria-label', 'Copy code');
+  btn.onclick = () => {
+    navigator.clipboard.writeText(block.innerText);
+    btn.innerHTML = ICONS.check;
+    btn.title = 'Copied';
+    btn.setAttribute('aria-label', 'Copied');
+    setTimeout(() => {
+      btn.innerHTML = ICONS.copy;
+      btn.title = 'Copy code';
+      btn.setAttribute('aria-label', 'Copy code');
+    }, 1500);
+  };
+  block.parentElement.appendChild(btn);
+}
+
+export function applyMarkdown(el, text, options = {}) {
+  const { copyCodeButtons = true } = options;
   el.innerHTML = renderMarkdown(text);
   enhanceWorkspaceFileLinks(el);
 
   el.querySelectorAll('pre code').forEach(block => {
     hljs.highlightElement(block);
-    const btn = document.createElement('button');
-    btn.className = 'code-copy';
-    btn.type = 'button';
-    btn.innerHTML = ICONS.copy;
-    btn.title = 'Copy code';
-    btn.setAttribute('aria-label', 'Copy code');
-    btn.onclick = () => {
-      navigator.clipboard.writeText(block.innerText);
-      btn.innerHTML = ICONS.check;
-      btn.title = 'Copied';
-      btn.setAttribute('aria-label', 'Copied');
-      setTimeout(() => {
-        btn.innerHTML = ICONS.copy;
-        btn.title = 'Copy code';
-        btn.setAttribute('aria-label', 'Copy code');
-      }, 1500);
-    };
-    block.parentElement.appendChild(btn);
+    if (copyCodeButtons) addCodeCopyButton(block);
   });
 }

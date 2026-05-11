@@ -3,7 +3,7 @@
 import { api } from './api.js';
 import { state } from './state.js';
 import { ICONS } from './icons.js';
-import { applyMarkdown } from './markdown.js';
+import { applyMarkdown, codeFenceFor } from './markdown.js';
 import { showToast } from './ui.js';
 import { escapeHtml, formatBytes, fileExtension as ext } from './format.js';
 
@@ -238,17 +238,15 @@ async function loadFilePreview(path) {
 
   copy.disabled = false;
   copy.dataset.content = data.content || '';
-  if (isMarkdown(data.name)) {
-    const preview = document.createElement('div');
-    preview.className = 'file-markdown-preview msg-content';
-    body.innerHTML = '';
-    body.appendChild(preview);
-    applyMarkdown(preview, data.content || '');
-  } else {
-    const language = languageFromName(data.name);
-    body.innerHTML = `<pre class="file-code-preview"><code class="${language ? `language-${language}` : ''}">${escapeHtml(data.content || '')}</code></pre>`;
-    body.querySelectorAll('pre code').forEach(block => window.hljs?.highlightElement(block));
-  }
+
+  const preview = document.createElement('div');
+  preview.className = `file-preview-content msg-content${isMarkdown(data.name) ? '' : ' file-preview-code'}`;
+  body.innerHTML = '';
+  body.appendChild(preview);
+
+  const language = languageFromName(data.name);
+  const markdown = isMarkdown(data.name) ? data.content || '' : codeFenceFor(data.content || '', language);
+  applyMarkdown(preview, markdown, { copyCodeButtons: false });
   return true;
 }
 

@@ -140,7 +140,7 @@
   --code-bg: #f0eeea;
   --shadow:  0 8px 32px rgba(0,0,0,.12);
 }
-[data-theme="light"] .hljs { color: #24292f; background: transparent; }
+[data-theme="light"] .hljs { color: #24292f; }
 [data-theme="light"] .hljs-doctag,
 [data-theme="light"] .hljs-keyword,
 [data-theme="light"] .hljs-meta .hljs-keyword,
