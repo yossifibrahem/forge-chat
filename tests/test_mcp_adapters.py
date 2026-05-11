@@ -27,10 +27,11 @@ class TestExpandConfigEnv:
         assert result["KEY"] == "value"
 
     def test_tilde_expanded_to_absolute_path(self):
-        # Must produce an absolute path, not leave ~ in place
+        # Must produce an absolute path, not leave ~ in place.
+        # Use os.path.isabs() so the check works on Windows (C:\...) too.
         result = mcp_adapters.expand_config_env({"P": "~/projects"})
         assert not result["P"].startswith("~")
-        assert result["P"].startswith("/")
+        assert os.path.isabs(result["P"])
 
     def test_none_input_returns_empty_dict(self):
         assert mcp_adapters.expand_config_env(None) == {}

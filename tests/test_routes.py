@@ -15,6 +15,7 @@ Coverage:
 from __future__ import annotations
 
 import json
+import os
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -140,7 +141,7 @@ class TestConversationMetaRoutes:
         resp = client.get(f"/api/conversations/{conv['id']}/workspace")
         assert resp.status_code == 200
         wd = resp.json.get("working_directory", "")
-        assert wd.startswith("/")  # must be an absolute host path
+        assert os.path.isabs(wd)  # must be an absolute host path (works on Windows too)
 
     def test_container_status_for_known_conv(self, client, tmp_lumen):
         conv = store.create("container")
