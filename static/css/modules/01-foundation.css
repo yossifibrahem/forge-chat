@@ -3,40 +3,6 @@
 /* ─── Foundations ─────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  --bg: #111210;
-  --surface: #181916;
-  --surface2: #1f201d;
-  --surface3: #272825;
-  --border: #2e302b;
-  --border2: #3a3c37;
-  --accent: #c9a96e;
-  --accent-dim: rgba(201,169,110,.12);
-  --accent-hover: rgba(201,169,110,.20);
-  --accent-glow: rgba(201,169,110,.06);
-  --accent-border: rgba(201,169,110,.4);
-  --accent-border-dim: rgba(201,169,110,.25);
-  --accent-border-mid: rgba(201,169,110,.50);
-  --green: #6db87a;
-  --red: #e07070;
-  --blue: #6fa3c9;
-  --text: #e8e6e1;
-  --text2: #9a978f;
-  --text3: #5a5850;
-  --code-bg: #0d0e0c;
-  --radius: 10px;
-  --radius-sm: 7px;
-  --radius-md: 8px;
-  --sidebar-w: 260px;
-  --content-w: 820px;
-  --dock-w: 760px;
-  --shadow: 0 8px 32px rgba(0,0,0,.5);
-  --font-tiempos: 'Tiempos Text', Georgia, serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --fast: .15s;
-  --ease: cubic-bezier(.4,0,.2,1);
-}
-
 html, body { height: var(--vvh, 100dvh); overflow: hidden; }
 html { font-size: var(--font-size-base, 15px); }
 body {
