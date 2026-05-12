@@ -23,7 +23,7 @@
   background: none; border: none; color: var(--text3); cursor: pointer;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
-.eye-btn:hover { color: var(--text); background: var(--surface3); }
+.eye-btn:hover { color: var(--text); background: var(--surface); }
 
 /* Range slider */
 .range-slider {
@@ -128,12 +128,6 @@
 
 /* Light theme overrides */
 :root {
-  --bg: #f7f5f0;
-  --surface: #f0eee7;
-  --surface2: #ffffff;
-  --surface3: #ebe7df;
-  --border: #ded9cf;
-  --border2: #cfc7ba;
   --accent: #cc785c;
   --accent-dim: rgba(204, 120, 92, .12);
   --accent-hover: rgba(204, 120, 92, .18);
@@ -184,7 +178,7 @@
   --text: #2b2925;
   --text2: #6f6a61;
   --text3: #9c9488;
-  --code-bg: #f1eee7;
+  --code-bg: hsl(42, 26%, 93%);
   --shadow: 0 18px 48px rgba(43, 41, 37, .12);
 }
 [data-theme="light"] .hljs { color: #24292f; }
