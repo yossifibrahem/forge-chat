@@ -501,33 +501,39 @@ function normalizeContentAttachments(content = {}) {
 
 function renderAttachmentCard(attachment, { edit = false } = {}) {
   if (attachment.kind === 'image') {
-    const btn = createElement('button', {
-      className: `msg-attachment-card msg-image-card${edit ? ' msg-edit-image-card' : ''}`,
-      html: `<img class="msg-attachment-image${edit ? ' msg-edit-image-thumb' : ''}" alt="" />`,
+    const card = createElement('div', {
+      className: `attachment-card attachment-card--image${edit ? ' msg-edit-image-card' : ''}`,
+      html: `<img class="attachment-card-thumb${edit ? ' msg-edit-image-thumb' : ''}" alt="" />
+             <div class="attachment-card-overlay">
+               <span class="attachment-card-name"></span>
+             </div>`,
     });
-    const img = btn.querySelector('img');
+    const img = card.querySelector('img');
     img.src = attachment.url || '';
-    btn.title = attachment.name ? `Open ${attachment.name}` : 'Open image';
-    btn.addEventListener('click', () => {
+    img.alt = attachment.name || 'image';
+    card.querySelector('.attachment-card-name').textContent = attachment.name || 'image';
+    card.title = attachment.name ? `Open ${attachment.name}` : 'Open image';
+    card.style.cursor = 'zoom-in';
+    card.addEventListener('click', () => {
       if (attachment.url) window.open(attachment.url, '_blank');
     });
-    return btn;
+    return card;
   }
 
-  const card = createElement('div', { className: `msg-attachment-card msg-file-card${edit ? ' msg-edit-file-card' : ''}` });
+  const card = createElement('div', { className: `attachment-card attachment-card--file${edit ? ' msg-edit-file-card' : ''}` });
   card.title = attachment.path ? `Available to tools at ${attachment.path}` : '';
   const badge = fileExtensionLabel(attachment.name || 'file');
   const size = formatBytes(attachment.size || 0, { emptyZero: true });
   card.innerHTML = `
-    <div class="msg-file-card-body">
-      <div class="msg-file-card-name"></div>
-      <div class="msg-file-card-subtle">Available in chat workspace</div>
-      <div class="msg-file-card-meta">
-        <span class="msg-file-card-badge">${escapeHtml(badge)}</span>
-        ${size ? `<span class="msg-file-card-size">${size}</span>` : ''}
+    <div class="attachment-card-body">
+      <div class="attachment-card-name"></div>
+      <div class="attachment-card-subtle">Available in chat workspace</div>
+      <div class="attachment-card-footer">
+        <span class="attachment-card-badge">${escapeHtml(badge)}</span>
+        ${size ? `<span class="attachment-card-size">${size}</span>` : ''}
       </div>
     </div>`;
-  card.querySelector('.msg-file-card-name').textContent = attachment.name || 'file';
+  card.querySelector('.attachment-card-name').textContent = attachment.name || 'file';
   return card;
 }
 

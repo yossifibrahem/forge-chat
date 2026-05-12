@@ -42,16 +42,10 @@
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border2) transparent;
+  scrollbar-width: none;
 }
+#image-preview-bar::-webkit-scrollbar { display: none; }
 #image-preview-bar[hidden] { display: none; }
-#image-preview-bar::-webkit-scrollbar { height: 6px; }
-#image-preview-bar::-webkit-scrollbar-track { background: transparent; }
-#image-preview-bar::-webkit-scrollbar-thumb {
-  background: var(--border2);
-  border-radius: 999px;
-}
 
 
 #user-input {
@@ -272,101 +266,19 @@
 }
 .suggestion-chip svg { width: 12px; height: 12px; opacity: .6; }
 
-/* ─── Composer attachment previews ───────────────────────────────────────── */
-.composer-attachment-card {
-  position: relative;
-  flex: 0 0 min(112px, calc(50vw - 44px));
-  width: min(112px, calc(50vw - 44px));
-  aspect-ratio: 1 / 1;
-  min-height: 0;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)), var(--surface2);
-  overflow: hidden;
-}
-.composer-image-card { background: var(--surface2); }
-.composer-file-card {
-  display: flex;
-  flex-direction: column;
-  padding: 10px;
-  height: 100%;
-}
-.composer-attachment-thumb {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-  transition: opacity .2s, transform .2s;
-}
-.composer-attachment-card:hover .composer-attachment-thumb { transform: scale(1.02); }
-.img-preview-uploading { opacity: .58; }
-.img-preview-error { opacity: .35; border-color: var(--red); filter: grayscale(1); }
-.composer-attachment-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-}
-.composer-attachment-meta-overlay {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 20px 8px 8px 8px;
-  background: linear-gradient(180deg, transparent, rgba(0,0,0,.78));
-}
-.composer-attachment-name {
-  color: var(--text);
-  font-size: .73rem;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-}
-.composer-attachment-subtle {
-  color: var(--text2);
-  font-size: .68rem;
-}
-.composer-attachment-badge-row { margin-top: auto; padding-top: 4px; }
-.composer-attachment-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 18px;
-  padding: 0 6px;
-  border: 1px solid var(--border2);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text2);
-  font-family: var(--font-mono);
-  font-size: .62rem;
-  line-height: 1;
-  letter-spacing: .05em;
-}
-.img-preview-remove {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: none;
-  color: var(--text2);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-2px) scale(.96);
-  transition: opacity var(--fast), transform var(--fast), background var(--fast), color var(--fast);
-}
-.composer-attachment-card:hover .img-preview-remove,
-.composer-attachment-card:focus-within .img-preview-remove,
-.img-preview-remove:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0) scale(1);
-}
-.img-preview-remove svg { width: 11px; height: 11px; }
-.img-preview-remove:hover { background: rgba(224,112,112,.18); color: var(--red); }
-
+/* ─── Composer attachment previews → see 14-attachment-card.css ───────────── *
+ * Unified class names:                                                         *
+ *   .composer-attachment-card   →  .attachment-card                            *
+ *   .composer-image-card        →  .attachment-card.attachment-card--image     *
+ *   .composer-file-card         →  .attachment-card.attachment-card--file      *
+ *   .composer-attachment-thumb  →  .attachment-card-thumb                      *
+ *   .composer-attachment-meta-overlay → .attachment-card-overlay               *
+ *   .composer-attachment-meta   →  .attachment-card-body                       *
+ *   .composer-attachment-name   →  .attachment-card-name                       *
+ *   .composer-attachment-subtle →  .attachment-card-subtle                     *
+ *   .composer-attachment-badge-row → .attachment-card-footer                   *
+ *   .composer-attachment-badge  →  .attachment-card-badge                      *
+ *   .img-preview-uploading      →  .attachment-card.is-uploading               *
+ *   .img-preview-error          →  .attachment-card.is-error                   *
+ *   .img-preview-remove         →  .attachment-card-remove                     *
+ * ─────────────────────────────────────────────────────────────────────────── */

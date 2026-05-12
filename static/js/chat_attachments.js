@@ -37,39 +37,38 @@ function refreshImagePreviewBar() {
 
   pendingAttachments.forEach((entry, idx) => {
     const wrap = document.createElement('div');
-    wrap.className = `composer-attachment-card ${entry.kind === 'image' ? 'composer-image-card' : 'composer-file-card'}`;
+    wrap.className = `attachment-card ${entry.kind === 'image' ? 'attachment-card--image is-uploading' : 'attachment-card--file'}`;
 
     if (entry.kind === 'image') {
       wrap.innerHTML = `
-        <img class="composer-attachment-thumb img-preview-uploading" src="${entry.previewUrl}" alt="" />
-        <div class="composer-attachment-meta composer-attachment-meta-overlay">
-          <div class="composer-attachment-name" title="${escapeHtml(entry.name || 'image')}">${escapeHtml(entry.name || 'image')}</div>
-          <div class="composer-attachment-subtle">${formatBytes(entry.size || 0)}</div>
+        <img class="attachment-card-thumb" src="${entry.previewUrl}" alt="" />
+        <div class="attachment-card-overlay">
+          <div class="attachment-card-name" title="${escapeHtml(entry.name || 'image')}">${escapeHtml(entry.name || 'image')}</div>
+          <div class="attachment-card-subtle">${formatBytes(entry.size || 0)}</div>
         </div>
-        <button class="img-preview-remove" title="Remove attachment" aria-label="Remove attachment">
+        <button class="attachment-card-remove" title="Remove attachment" aria-label="Remove attachment">
           ${ICONS.close}
         </button>`;
 
-      const thumb = wrap.querySelector('.composer-attachment-thumb');
       entry.uploadPromise.then(result => {
-        if (result) thumb.classList.remove('img-preview-uploading');
-        else        thumb.classList.add('img-preview-error');
+        if (result) wrap.classList.remove('is-uploading');
+        else        wrap.classList.add('is-error');
       });
     } else {
       wrap.innerHTML = `
-        <div class="composer-attachment-meta">
-          <div class="composer-attachment-name" title="${escapeHtml(entry.name || 'file')}">${escapeHtml(entry.name || 'file')}</div>
-          <div class="composer-attachment-subtle">${formatBytes(entry.size || 0)}</div>
-          <div class="composer-attachment-badge-row">
-            <span class="composer-attachment-badge">${escapeHtml(fileExtensionLabel(entry.name || 'file'))}</span>
+        <div class="attachment-card-body">
+          <div class="attachment-card-name" title="${escapeHtml(entry.name || 'file')}">${escapeHtml(entry.name || 'file')}</div>
+          <div class="attachment-card-subtle">${formatBytes(entry.size || 0)}</div>
+          <div class="attachment-card-footer">
+            <span class="attachment-card-badge">${escapeHtml(fileExtensionLabel(entry.name || 'file'))}</span>
           </div>
         </div>
-        <button class="img-preview-remove" title="Remove attachment" aria-label="Remove attachment">
+        <button class="attachment-card-remove" title="Remove attachment" aria-label="Remove attachment">
           ${ICONS.close}
         </button>`;
     }
 
-    wrap.querySelector('.img-preview-remove').addEventListener('click', () => {
+    wrap.querySelector('.attachment-card-remove').addEventListener('click', () => {
       pendingAttachments.splice(idx, 1);
       refreshImagePreviewBar();
     });

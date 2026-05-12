@@ -62,11 +62,6 @@
   text-decoration-color: var(--border2);
 }
 
-.msg-images, .msg-edit-images { display: flex; flex-wrap: wrap; gap: 8px; }
-.msg-images { margin-top: 8px; }
-.msg-image { max-width: 280px; max-height: 280px; border: 1px solid var(--border); border-radius: var(--radius); object-fit: contain; cursor: zoom-in; transition: opacity var(--fast); }
-.msg-image:hover { opacity: .88; }
-
 .msg-attachments-grid {
   display: flex;
   flex-wrap: wrap;
@@ -79,66 +74,16 @@
    floating to the far right. */
 .msg-attachments-grid { justify-content: flex-start; }
 .user-row .msg-attachments-grid { justify-content: flex-start; }
-.msg-attachment-card {
-  position: relative;
-  width: min(112px, calc(50vw - 44px));
-  aspect-ratio: 1 / 1;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)), var(--surface2);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.03), 0 8px 24px rgba(0,0,0,.08);
-}
-.msg-image-card {
-  padding: 0;
-  aspect-ratio: 1 / 1;
-  cursor: zoom-in;
-}
-.msg-attachment-image {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-  transition: transform var(--fast), opacity var(--fast);
-}
-.msg-image-card:hover .msg-attachment-image { transform: scale(1.02); opacity: .94; }
-.msg-file-card {
-  min-height: 0;
-  padding: 10px;
-  display: flex;
-}
-.msg-file-card-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
-.msg-file-card-name {
-  color: var(--text);
-  font-size: .78rem;
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-}
-.msg-file-card-subtle { color: var(--text2); font-size: .66rem; line-height: 1.25; }
-.msg-file-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: auto;
-}
-.msg-file-card-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 18px;
-  padding: 0 6px;
-  border: 1px solid var(--border2);
-  border-radius: 999px;
-  background: rgba(255,255,255,.035);
-  color: var(--text2);
-  font-family: var(--font-mono);
-  font-size: .62rem;
-  line-height: 1;
-  letter-spacing: .05em;
-}
-.msg-file-card-size { color: var(--text3); font-size: .62rem; font-family: var(--font-mono); }
-
+/* ─── Message attachment cards → see 14-attachment-card.css ──────────────── *
+ * Unified class names:                                                         *
+ *   .msg-attachment-card   →  .attachment-card                                 *
+ *   .msg-image-card        →  .attachment-card.attachment-card--image          *
+ *   .msg-attachment-image  →  .attachment-card-thumb                           *
+ *   .msg-file-card         →  .attachment-card.attachment-card--file           *
+ *   .msg-file-card-body    →  .attachment-card-body                            *
+ *   .msg-file-card-name    →  .attachment-card-name                            *
+ *   .msg-file-card-subtle  →  .attachment-card-subtle                          *
+ *   .msg-file-card-meta    →  .attachment-card-footer                          *
+ *   .msg-file-card-badge   →  .attachment-card-badge                           *
+ *   .msg-file-card-size    →  .attachment-card-size                            *
+ * ─────────────────────────────────────────────────────────────────────────── */

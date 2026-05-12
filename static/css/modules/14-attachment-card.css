@@ -1,0 +1,240 @@
+/* ─── Unified Attachment Card ─────────────────────────────────────────────────
+ *
+ * Single source of truth for attachment cards used in both:
+ *   - The composer's image-preview bar  (was: .composer-attachment-card)
+ *   - Message attachment grids          (was: .msg-attachment-card)
+ *
+ * HTML structure
+ * ──────────────
+ * Image card:
+ *   <div class="attachment-card attachment-card--image [is-uploading|is-error|is-zoom]">
+ *     <img class="attachment-card-thumb" src="…" alt="…">
+ *     <!-- optional label overlay on image cards -->
+ *     <div class="attachment-card-overlay">
+ *       <span class="attachment-card-name">photo.jpg</span>
+ *     </div>
+ *     <button class="attachment-card-remove">…</button>
+ *   </div>
+ *
+ * File card:
+ *   <div class="attachment-card attachment-card--file">
+ *     <div class="attachment-card-body">
+ *       <span class="attachment-card-name">report.pdf</span>
+ *       <span class="attachment-card-subtle">PDF document</span>
+ *       <div class="attachment-card-footer">
+ *         <span class="attachment-card-badge">PDF</span>
+ *         <span class="attachment-card-size">142 KB</span>
+ *       </div>
+ *     </div>
+ *     <button class="attachment-card-remove">…</button>
+ *   </div>
+ *
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* ─── Base card ───────────────────────────────────────────────────────────── */
+.attachment-card {
+  position: relative;
+  flex: 0 0 min(112px, calc(50vw - 44px));
+  width: min(112px, calc(50vw - 44px));
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.04) 0%, rgba(255,255,255,.01) 100%),
+              var(--surface2);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    0 4px 16px rgba(0,0,0,.10),
+    0 1px 3px rgba(0,0,0,.06);
+  overflow: hidden;
+  transition: border-color var(--fast), box-shadow var(--fast);
+}
+
+.attachment-card:hover {
+  border-color: var(--border2);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 8px 24px rgba(0,0,0,.14),
+    0 2px 6px rgba(0,0,0,.08);
+}
+
+/* ─── Image variant ───────────────────────────────────────────────────────── */
+.attachment-card--image {
+  cursor: zoom-in;
+}
+
+.attachment-card-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform .22s var(--ease), opacity .18s;
+}
+
+.attachment-card--image:hover .attachment-card-thumb {
+  transform: scale(1.03);
+}
+
+/* ─── File variant ────────────────────────────────────────────────────────── */
+.attachment-card--file {
+  display: flex;
+  cursor: default;
+}
+
+.attachment-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+}
+
+/* ─── Text elements ───────────────────────────────────────────────────────── */
+.attachment-card-name {
+  color: var(--text);
+  font-size: .75rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.attachment-card-subtle {
+  color: var(--text2);
+  font-size: .67rem;
+  line-height: 1.3;
+}
+
+/* ─── Footer (badges + size) ──────────────────────────────────────────────── */
+.attachment-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.attachment-card-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  background: rgba(255,255,255,.035);
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  line-height: 1;
+  letter-spacing: .05em;
+}
+
+.attachment-card-size {
+  color: var(--text3);
+  font-size: .62rem;
+  font-family: var(--font-mono);
+}
+
+/* ─── Overlay (gradient label layer for image cards) ─────────────────────── */
+.attachment-card-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 22px 8px 8px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,.80));
+  pointer-events: none;
+}
+
+.attachment-card-overlay .attachment-card-name {
+  color: #fff;
+}
+
+/* ─── Remove button ───────────────────────────────────────────────────────── */
+.attachment-card-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px;
+  background: rgba(0,0,0,.42);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: rgba(255,255,255,.7);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px) scale(.92);
+  transition: opacity var(--fast), transform var(--fast),
+              background var(--fast), color var(--fast);
+}
+
+.attachment-card:hover .attachment-card-remove,
+.attachment-card:focus-within .attachment-card-remove,
+.attachment-card-remove:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.attachment-card-remove:hover {
+  background: rgba(224,112,112,.72);
+  border-color: rgba(224,112,112,.4);
+  color: #fff;
+}
+
+.attachment-card-remove svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* ─── State modifiers ─────────────────────────────────────────────────────── */
+.attachment-card.is-uploading .attachment-card-thumb {
+  opacity: .55;
+}
+
+.attachment-card.is-uploading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,.06) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: attachmentSweep 1.4s linear infinite;
+}
+
+@keyframes attachmentSweep {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+
+.attachment-card.is-error {
+  border-color: rgba(224,112,112,.4);
+}
+
+.attachment-card.is-error .attachment-card-thumb {
+  opacity: .3;
+  filter: grayscale(1);
+}
+
+.attachment-card.is-error::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(224,112,112,.25);
+  pointer-events: none;
+}
