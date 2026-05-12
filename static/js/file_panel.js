@@ -345,5 +345,11 @@ export function initFilePanel() {
     link.click();
     link.remove();
   });
-}
 
+  document.addEventListener('lumen:open-workspace-file', e => {
+    const path = e.detail?.path;
+    if (!path) return;
+    setPanelOpen(true);
+    loadFilePreview(path).catch(() => {});
+  });
+}

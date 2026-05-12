@@ -74,9 +74,12 @@ function enhanceWorkspaceFileLinks(root) {
     const name = fileNameFromPath(filePath);
     anchor.classList.add('assistant-file-link');
     anchor.href = downloadHref;
-    anchor.download = name;
-    anchor.title = `Download ${name}`;
+    anchor.title = `Open ${name} in file panel`;
     anchor.dataset.workspacePath = filePath;
+    anchor.addEventListener('click', e => {
+      e.preventDefault();
+      document.dispatchEvent(new CustomEvent('lumen:open-workspace-file', { detail: { path: filePath } }));
+    });
   });
 }
 
