@@ -1,5 +1,13 @@
 /* Reset, design tokens, global primitives, shared utility rules. */
 
+/* ─── Global animation / timing tokens ───────────────────────────────────── */
+/* These are used throughout every module and must be defined first. */
+:root {
+  --fast: .15s;
+  --ease: cubic-bezier(0.33, 0, 0.2, 1);
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Mono', monospace;
+}
+
 /* ─── Foundations ─────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -76,7 +84,7 @@ svg { flex-shrink: 0; }
   border: none;
 }
 
-:is(#btn-toggle-sidebar, #btn-toggle-files, #modal-close, .conv-menu-btn, #attach-btn, #mic-btn, #msg-action-btn, .file-panel-actions button, .file-preview-actions button,.tc-allow, .tc-deny, .modal-tab, .model-refresh-btn, .eye-btn) {
+:is(#btn-toggle-sidebar, #btn-toggle-files, .modal-close, .conv-menu-btn, #attach-btn, #mic-btn, #msg-action-btn, .file-panel-actions button, .file-preview-actions button, .tc-allow, .tc-deny, .modal-tab, .model-refresh-btn, .eye-btn) {
   background: none;
 }
 

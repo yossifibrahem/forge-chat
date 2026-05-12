@@ -98,10 +98,6 @@
   height: 32px;
   border-radius: 8px;
   color: var(--text3);
-  display: grid;
-  place-items: center;
-  border: none;
-  background: none;
 }
 #attach-btn:hover { color: var(--text); background: var(--surface); }
 #attach-btn svg { width: 15px; height: 15px; }
@@ -111,11 +107,6 @@
   height: 32px;
   border-radius: 8px;
   color: var(--text3);
-  display: grid;
-  place-items: center;
-  border: none;
-  background: none;
-  transition: color var(--fast), background var(--fast);
 }
 #mic-btn:hover { color: var(--text); background: var(--surface); }
 #mic-btn svg { width: 15px; height: 15px; }
@@ -179,8 +170,13 @@
 }
 #model-popover.open { opacity: 1; pointer-events: all; transform: none; }
 .mp-header { padding: 10px 12px 7px; border-bottom: 1px solid var(--border); color: var(--text3); font-size: .63rem; text-transform: uppercase; letter-spacing: .8px; }
-#mp-model-list, .model-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+/* .model-list base is defined in 07-modal-forms.css. Only #mp-model-list
+   needs overrides here for the toolbar popover layout. */
 #mp-model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
   max-height: 360px;
@@ -208,9 +204,6 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  display: grid;
-  place-items: center;
-  border: none;
 }
 #send-btn { background: var(--accent); color: var(--bg); }
 #send-btn:hover { opacity: .88; transform: scale(1.05); }

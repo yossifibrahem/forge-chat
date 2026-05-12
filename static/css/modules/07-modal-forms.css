@@ -5,7 +5,7 @@
 .modal-overlay.open { opacity: 1; pointer-events: all; }
 .modal { width: 100%; max-width: 580px; height: 75vh; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 14px; background: var(--bg); box-shadow: var(--shadow); transform: translateY(10px) scale(.98); transition: transform .22s var(--ease); }
 .modal-overlay.open .modal { transform: none; }
-.modal-header { justify-content: space-between; padding: 20px 22px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; }
+.modal-header { justify-content: space-between; padding: 20px 22px 16px; border-bottom: 1px solid var(--border); }
 .modal-tabs { display: flex; flex: 1; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .modal-tabs::-webkit-scrollbar { display: none; }
 .modal-tab { position: relative; padding: 6px 14px; border: none; border-radius: 7px; color: var(--text3); font-size: 0.9rem; font-weight: 500; letter-spacing: .3px; background: none; white-space: nowrap; flex-shrink: 0; }
@@ -14,11 +14,11 @@
 .tab-panel, .tab-footer-btn { display: none; }
 .tab-panel.active { display: block; }
 .tab-footer-btn.active { display: inline-flex; }
-.modal-close { color: var(--text3); background: none; border: none; }
+.modal-close { color: var(--text3); }
 .modal-close:hover { background: var(--surface); color: var(--text); }
 .modal-close svg { width: 16px; height: 16px; }
 .modal-body { flex: 1; overflow-y: auto; padding: 22px; }
-.modal-footer { justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border); display: flex; align-items: center; }
+.modal-footer { justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border); }
 
 .field { margin-bottom: 18px; }
 .field:last-child { margin-bottom: 0; }
@@ -30,7 +30,7 @@
 .textarea-tall { min-height: 110px; }
 /* Make the system prompt textarea taller for easier editing */
 #system-prompt { min-height: 180px; }
-.btn-row { gap: 8px; margin-bottom: 4px; display: flex; align-items: center; }
+.btn-row { gap: 8px; margin-bottom: 4px; }
 .mcp-actions-row { margin-top: 10px; }
 .btn-primary, .btn-secondary { min-height: 34px; padding: 8px 16px; border: none; border-radius: var(--radius-md); font-size: .73rem; font-weight: 500; letter-spacing: .3px; }
 .btn-primary { background: var(--accent); color: var(--bg); }
