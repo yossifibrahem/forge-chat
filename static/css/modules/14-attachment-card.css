@@ -93,7 +93,7 @@
 /* ─── Text elements ───────────────────────────────────────────────────────── */
 .attachment-card-name {
   color: var(--text);
-  font-size: .75rem;
+  font-size: .62rem;
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -116,15 +116,14 @@
   display: inline-flex;
   align-items: center;
   min-height: 18px;
-  padding: 0 6px;
+  padding: 0 4px;
   border: 1px solid var(--border2);
-  border-radius: 999px;
-  background: rgba(255,255,255,.035);
+  border-radius: 4px;
+  background: var(--surface2);
   color: var(--text2);
   font-family: var(--font-mono);
   font-size: .62rem;
   line-height: 1;
-  letter-spacing: .05em;
 }
 
 .attachment-card-size {
