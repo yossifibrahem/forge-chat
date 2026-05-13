@@ -17,7 +17,7 @@ import { clearMessages } from './renderer.js';
 import { ICONS, initIcons } from './icons.js';
 import { loadCustomization, saveCustomization, resetCustomization, initSwatchPicker, syncCustomizationUI } from './customization.js';
 import { initFilePanel } from './file_panel.js';
-import { loadAdvancedSettings, saveAdvancedSettings } from './advanced_settings.js';
+import { loadAdvancedSettings, saveAdvancedSettings, deleteAllData } from './advanced_settings.js';
 
 // ── Event binding ─────────────────────────────────────────────────────────────
 
@@ -122,6 +122,52 @@ function bindSettingsEvents() {
   document.getElementById('btn-save-customization').addEventListener('click', saveCustomization);
   document.getElementById('btn-reset-customization').addEventListener('click', resetCustomization);
   document.getElementById('btn-save-advanced').addEventListener('click', saveAdvancedSettings);
+
+  document.getElementById('btn-danger-delete-all').addEventListener('click', async () => {
+    const btn      = document.getElementById('btn-danger-delete-all');
+    const statusEl = document.getElementById('danger-delete-status');
+
+    // Two-click confirmation: first click arms the button, second executes.
+    if (!btn.dataset.armed) {
+      btn.dataset.armed    = '1';
+      btn.textContent      = 'Click again to confirm';
+      btn.style.opacity    = '1';
+      statusEl.textContent = 'This will permanently delete ALL chats and container workspaces.';
+      statusEl.className   = 'danger-status warn';
+      // Auto-disarm after 5 s if the user changes their mind.
+      setTimeout(() => {
+        delete btn.dataset.armed;
+        btn.textContent      = 'Delete all chats & containers';
+        btn.style.opacity    = '';
+        statusEl.textContent = '';
+        statusEl.className   = 'danger-status';
+      }, 5000);
+      return;
+    }
+
+    // Confirmed — execute.
+    delete btn.dataset.armed;
+    btn.disabled    = true;
+    btn.textContent = 'Deleting…';
+    statusEl.textContent = '';
+    statusEl.className   = 'danger-status';
+
+    const result = await deleteAllData();
+
+    btn.disabled    = false;
+    btn.textContent = 'Delete all chats & containers';
+
+    if (result.ok) {
+      // Reset the in-memory UI to an empty state.
+      startNewChat();
+      await loadConversationList();
+      statusEl.textContent = `Deleted ${result.deleted} conversation${result.deleted === 1 ? '' : 's'}.`;
+      statusEl.className   = 'danger-status ok';
+    } else {
+      statusEl.textContent = `Error: ${result.error}`;
+      statusEl.className   = 'danger-status err';
+    }
+  });
   initSwatchPicker();
   initKeyToggle();
   initParameterSliders();

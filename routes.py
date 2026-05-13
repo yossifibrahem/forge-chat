@@ -402,6 +402,26 @@ def save_advanced_settings():
         return jsonify({"error": str(exc)}), 400
 
 
+@blueprint.route("/api/danger/delete-all", methods=["POST"])
+def danger_delete_all():
+    """Delete every conversation, its container, and its workspace directory."""
+    conversations = store.list_all()
+    errors = []
+    for conv in conversations:
+        conv_id = conv.get("id")
+        if not conv_id:
+            continue
+        try:
+            store.delete(conv_id)
+            container_service.stop_container(conv_id)
+            container_service.delete_workspace(conv_id)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{conv_id}: {exc}")
+    if errors:
+        return jsonify({"ok": False, "errors": errors}), 500
+    return jsonify({"ok": True, "deleted": len(conversations)})
+
+
 # ── Models ────────────────────────────────────────────────────────────────────
 
 @blueprint.route("/api/models", methods=["POST"])
