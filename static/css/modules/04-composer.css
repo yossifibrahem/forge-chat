@@ -3,7 +3,7 @@
 /* ─── Floating Composer ────────────────────────────────────────────────────── */
 #composer-area {
   position: absolute;
-  bottom: 24px;
+  bottom: 0px;
   left: 50%;
   transform: translateX(-50%);
   width: min(var(--dock-w), calc(100% - 40px));
@@ -227,8 +227,8 @@
   font-size: .65rem;
   font-family: var(--font-mono);
   letter-spacing: .2px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--bg);
+  /* border: 1px solid var(--border); */
   border-top: none;
   border-radius: 0 0 8px 8px;
 }
