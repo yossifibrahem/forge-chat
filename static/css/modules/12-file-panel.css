@@ -19,7 +19,7 @@
   margin-right: calc(-1 * var(--file-panel-w));
   transition: transform .28s var(--ease), margin-right .28s var(--ease), width .12s linear;
   position: relative;
-  z-index: 15;
+  z-index: 20;
 }
 #file-panel.open { transform: translateX(0); margin-right: 0; }
 #file-panel.resizing { transition: none; user-select: none; }
