@@ -207,11 +207,11 @@ class McpSessionPool:
 
     def __init__(self, conv_id: str = "") -> None:
         self.conv_id = conv_id
-        self._jobs: "queue.Queue[tuple]" | None = None
+        self._jobs: asyncio.Queue | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._sessions: dict[str, dict] = {}
         self._closed = False
-        self._lock = threading.Lock()
 
     def __enter__(self) -> "McpSessionPool":
         self.start()
@@ -223,24 +223,24 @@ class McpSessionPool:
     def start(self) -> None:
         if self._thread:
             return
-        import queue
-
-        self._jobs = queue.Queue()
-        self._thread = threading.Thread(target=self._thread_main, name="mcp-session-pool", daemon=True)
+        ready = threading.Event()
+        self._thread = threading.Thread(target=self._thread_main, args=(ready,), name="mcp-session-pool", daemon=True)
         self._thread.start()
+        ready.wait()  # block until loop and queue are ready
 
-    def _thread_main(self) -> None:
+    def _thread_main(self, ready: threading.Event) -> None:
         try:
-            asyncio.run(self._worker())
+            asyncio.run(self._worker(ready))
         except Exception:
             log.exception("[mcp] session pool worker crashed")
 
-    async def _worker(self) -> None:
-        if self._jobs is None:
-            raise RuntimeError("MCP session pool was not started")
+    async def _worker(self, ready: threading.Event) -> None:
+        self._loop = asyncio.get_running_loop()
+        self._jobs = asyncio.Queue()
+        ready.set()
 
         while True:
-            job = await asyncio.to_thread(self._jobs.get)
+            job = await self._jobs.get()
             op = job[0]
             if op == "invoke":
                 _, server_name, server_config, tool_name, arguments, future = job
@@ -292,17 +292,16 @@ class McpSessionPool:
         if self._closed:
             raise RuntimeError("MCP session pool is closed")
         self.start()
-        if self._jobs is None:
+        if self._jobs is None or self._loop is None:
             raise RuntimeError("MCP session pool failed to start")
 
         from concurrent.futures import Future
 
         future: Future = Future()
-        with self._lock:
-            self._jobs.put(("invoke", server_name, server_config, tool_name, arguments, future))
-        # Block *outside* the lock. Holding a lock while waiting on a future is a
-        # deadlock risk: any code path that needs self._lock while this call is
-        # in-flight (e.g. a concurrent close()) would be permanently blocked.
+        self._loop.call_soon_threadsafe(
+            self._jobs.put_nowait,
+            ("invoke", server_name, server_config, tool_name, arguments, future),
+        )
         return future.result()
 
     async def _close_async(self) -> None:
@@ -323,12 +322,12 @@ class McpSessionPool:
         self._closed = True
         if not self._thread:
             return
-        if self._jobs is None:
+        if self._jobs is None or self._loop is None:
             raise RuntimeError("MCP session pool failed to start")
 
         from concurrent.futures import Future
 
         future: Future = Future()
-        self._jobs.put(("close", future))
+        self._loop.call_soon_threadsafe(self._jobs.put_nowait, ("close", future))
         future.result()
         self._thread.join(timeout=2)
