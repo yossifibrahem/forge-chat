@@ -36,13 +36,6 @@ _CONTAINER_LOCKS_GUARD = threading.Lock()
 _last_used: dict[str, float] = {}
 _last_used_lock = threading.Lock()
 
-# In-process cache of confirmed-running containers and their mounted volume sources.
-# Skips redundant docker-inspect calls when ensure_container is called multiple
-# times for the same container within a turn (e.g. once at turn start, then once
-# per new MCP server session opened by McpSessionPool._get_session).
-_running_cache: dict[str, frozenset] = {}  # conv_id → confirmed mounted extra-volume sources
-_running_cache_lock = threading.Lock()
-
 
 @dataclass(frozen=True)
 class ContainerInfo:
@@ -110,17 +103,8 @@ def get_status(conv_id: str) -> ContainerStatus:
 def ensure_container(conv_id: str, extra_volumes: list[str] | None = None) -> ContainerInfo:
     """Create/start the chat container, safely serialized per conversation."""
     _touch(conv_id)
-    required = frozenset(_volume_source(v) for v in (extra_volumes or []))
-    with _running_cache_lock:
-        cached = _running_cache.get(conv_id)
-    if cached is not None and required <= cached:
-        return ContainerInfo(conv_id, container_name(conv_id), _workspace(conv_id), "running")
     with _container_lock(conv_id):
-        info = _ensure_container_locked(conv_id, extra_volumes or [])
-    if info.status == "running":
-        with _running_cache_lock:
-            _running_cache[conv_id] = _running_cache.get(conv_id, frozenset()) | required
-    return info
+        return _ensure_container_locked(conv_id, extra_volumes or [])
 
 
 def _ensure_container_locked(conv_id: str, extra_volumes: list[str]) -> ContainerInfo:
@@ -206,8 +190,6 @@ def _reuse_conflicting_container(conv_id: str, required_sources: set[str]) -> Co
 
 def stop_container_process(conv_id: str) -> None:
     """Stop a running container but keep it available for quick reuse."""
-    with _running_cache_lock:
-        _running_cache.pop(conv_id, None)
     name = container_name(conv_id)
     if get_status(conv_id) != "running":
         return
@@ -219,8 +201,6 @@ def stop_container_process(conv_id: str) -> None:
 
 
 def stop_container(conv_id: str) -> None:
-    with _running_cache_lock:
-        _running_cache.pop(conv_id, None)
     name = container_name(conv_id)
     if get_status(conv_id) == "missing":
         return
