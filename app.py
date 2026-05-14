@@ -16,7 +16,10 @@ import sys
 from flask import Flask
 from flask_cors import CORS
 
-from routes import blueprint
+import routes_conversations
+import routes_chat
+import routes_mcp
+import routes_files
 import container_service
 import mcp_service
 
@@ -42,7 +45,10 @@ def create_app() -> Flask:
         if origin.strip()
     ]
     CORS(app, origins=allowed_origins)
-    app.register_blueprint(blueprint)
+    app.register_blueprint(routes_conversations.blueprint)
+    app.register_blueprint(routes_chat.blueprint)
+    app.register_blueprint(routes_mcp.blueprint)
+    app.register_blueprint(routes_files.blueprint)
     container_service.start_reaper()
     _cleanup_stale_containers()
     _register_shutdown_cleanup()

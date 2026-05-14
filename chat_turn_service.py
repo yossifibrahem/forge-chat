@@ -1,8 +1,7 @@
-"""Long-running chat turn orchestration and title generation."""
+"""Long-running chat turn orchestration."""
 from __future__ import annotations
 
 import json
-import re
 import threading
 import time
 from collections.abc import Callable
@@ -15,67 +14,13 @@ import container_service
 import mcp_service
 import store
 import streaming as stream_module
+import title_service
+import tool_approval
 
 Publish = Callable[[dict], None]
 
-# ── Tool approval ──────────────────────────────────────────────────────────────
-# Keyed by stream_id → { call_id → {"event": Event, "approved": bool} }
-_pending_approvals: dict[str, dict] = {}
-_pending_approvals_lock = threading.Lock()
-
-
-def resolve_tool_approval(stream_id: str, call_id: str, approved: bool) -> None:
-    """Called from the /api/chat/approve route to unblock a waiting tool call."""
-    with _pending_approvals_lock:
-        slot = _pending_approvals.get(stream_id, {}).get(call_id)
-    if slot:
-        slot["approved"] = approved
-        slot["event"].set()
-
-
-def _request_tool_approval(
-    stream_id: str,
-    call_id: str,
-    name: str,
-    args: dict,
-    publish: Publish,
-    cancel_event: threading.Event,
-) -> bool:
-    """Emit a tool_approval_required event and block until the client responds or the turn is cancelled."""
-    wait_event = threading.Event()
-    slot: dict = {"event": wait_event, "approved": False}
-
-    with _pending_approvals_lock:
-        _pending_approvals.setdefault(stream_id, {})[call_id] = slot
-
-    publish({"type": "tool_approval_required", "call_id": call_id, "name": name, "args": args})
-
-    while not wait_event.is_set() and not cancel_event.is_set():
-        wait_event.wait(timeout=0.5)
-
-    with _pending_approvals_lock:
-        pending_for_stream = _pending_approvals.get(stream_id)
-        if pending_for_stream is not None:
-            pending_for_stream.pop(call_id, None)
-            if not pending_for_stream:
-                _pending_approvals.pop(stream_id, None)
-
-    if cancel_event.is_set():
-        return False
-    return bool(slot["approved"])
-
-_SET_TITLE_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "set_title",
-        "description": "Set the conversation title.",
-        "parameters": {
-            "type": "object",
-            "properties": {"title": {"type": "string", "description": "The conversation title."}},
-            "required": ["title"],
-        },
-    },
-}
+# Re-export resolve_tool_approval so routes.py keeps its existing import path.
+resolve_tool_approval = tool_approval.resolve_tool_approval
 
 
 def openai_client(body: dict | None = None) -> OpenAI:
@@ -84,63 +29,6 @@ def openai_client(body: dict | None = None) -> OpenAI:
         api_key=cfg.get("api_key") or "sk-placeholder",
         base_url=cfg.get("api_base") or app_config.DEFAULT_API_BASE,
     )
-
-
-def _messages_to_text(messages: list) -> str:
-    lines = []
-    for msg in messages:
-        role = msg.get("role", "")
-        if role not in {"user", "assistant"}:
-            continue
-        content = msg.get("content", "")
-        if isinstance(content, list):
-            content = " ".join(p.get("text", "") for p in content if p.get("type") == "text")
-        content = str(content).replace("\n\n", " ").strip()
-        if content:
-            lines.append(f"{role}: {content}")
-    return "\n".join(lines)
-
-
-def _extract_title(message) -> str:
-    if message.tool_calls:
-        return json.loads(message.tool_calls[0].function.arguments)["title"]
-
-    reasoning = getattr(message, "reasoning_content", "") or ""
-    json_match = re.search(r"<tool_call>\s*(\{.*?})\s*</tool_call>", reasoning, re.DOTALL)
-    if json_match:
-        return json.loads(json_match.group(1))["arguments"]["title"]
-
-    xml_match = re.search(r"<parameter=title>\s*(.*?)\s*</parameter>", reasoning, re.DOTALL)
-    if xml_match:
-        return xml_match.group(1).strip()
-
-    raise ValueError("Model did not return a tool call")
-
-
-def _generate_title(body: dict, messages: list) -> str | None:
-    try:
-        response = openai_client(body).chat.completions.create(
-            model=body.get("model", "gpt-4o"),
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Call set_title with a 2–5 word Title Case title for this conversation.\n"
-                        "The title must name the specific subject, not describe the interaction.\n\n"
-                        "Good: 'Fibonacci Sequence in Python', 'Docker Volume Permissions', 'JWT Token Expiry Bug'\n"
-                        "Bad: 'Coding Help' (too vague), 'Asking About Docker' (action not topic), 'General Question' (meaningless)"
-                    ),
-                },
-                {"role": "user", "content": _messages_to_text(messages[:4])},
-            ],
-            tools=[_SET_TITLE_TOOL],
-            tool_choice="required",
-            max_tokens=256,
-            temperature=0.7,
-        )
-        return _extract_title(response.choices[0].message)
-    except Exception:
-        return None
 
 
 def _parse_stream_payload(raw_event) -> dict | None:
@@ -173,8 +61,8 @@ def _save_turn(conv_id: str, title: str, messages: list, display_log: list, *, s
 def _log_with_partial(base_log: list, reasoning: str, text: str) -> list:
     return [
         *base_log,
-        *([{"type": "thinking", "content": reasoning}] if reasoning else []),
-        *([{"type": "message", "role": "assistant", "content": text}] if text else []),
+        *([ {"type": "thinking", "content": reasoning}] if reasoning else []),
+        *([ {"type": "message", "role": "assistant", "content": text}] if text else []),
     ]
 
 
@@ -183,18 +71,7 @@ def _tool_meta_by_name(body: dict) -> dict:
 
 
 def _bare_tool_name(name: str, meta: dict | None = None) -> str:
-    """Strip the server_ namespace prefix, using originalName from meta if available.
-
-    Tool names are namespaced on the frontend as ``{server}_{tool}``
-    (see chat_payloads.js ``namespacedToolName``).  The ``originalName``
-    field in meta is the canonical source and is always preferred.
-
-    When originalName is absent the server name from meta is used to strip
-    exactly ``len(server) + 1`` characters from the front so that server
-    names that themselves contain underscores (e.g. ``my_search``) do not
-    mis-strip the tool name.  The last-resort heuristic (split on first ``_``)
-    is kept only for call-sites that have neither piece of metadata.
-    """
+    """Strip the server_ namespace prefix, using originalName from meta if available."""
     if meta and meta.get("originalName"):
         return meta["originalName"]
     if meta and meta.get("server"):
@@ -306,10 +183,6 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
     recorder.save(display_log, force=True)
 
     try:
-        # Pre-mount host volumes for every enabled MCP server before the turn
-        # begins. Without this, the container is set up lazily per-server and
-        # gets recreated each time the model switches to a server whose host
-        # path isn't yet mounted.
         if conv_id and body.get("mcp_tool_meta"):
             server_names = list({
                 t.get("server", "") for t in body["mcp_tool_meta"] if t.get("server")
@@ -378,9 +251,8 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
                     call_id = call.get("id", "")
                     args_preview = _safe_tool_args(call.get("function", {}).get("arguments", "{}"))
 
-                    # ── Approval gate ──────────────────────────────────────────
                     if not meta.get("autoApprove", False):
-                        approved = _request_tool_approval(
+                        approved = tool_approval.request_tool_approval(
                             stream_id, call_id, display_name, args_preview, publish, cancel_event
                         )
                         if not approved or cancel_event.is_set():
@@ -398,18 +270,10 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
                             recorder.save(display_log, force=True)
                             publish(deny_event)
                             continue
-                    # ──────────────────────────────────────────────────────────
 
-                    # Let the client show the actual running state even when the
-                    # server auto-approves the call and no approval UI is shown.
                     publish({"type": "tool_running", "name": display_name, "args": args_preview})
 
                     args, result = _run_mcp_call(meta, call, session_pool)
-                    # displayName is intentionally omitted here — the JS adapter system
-                    # (tool_adapters/) is the single source of truth for display labels.
-                    # Each adapter declares a `labelArg` (default: 'description') that
-                    # getToolDisplayLabel() reads to pick the right argument, so adding
-                    # a new tool with a different label key requires only a new adapter file.
                     event = {
                         "type": "tool_result",
                         "name": display_name,
@@ -430,7 +294,7 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
 
         if assistant_completed and is_first_message and not cancel_event.is_set() \
                 and body.get("auto_generate_titles", True):
-            generated_title = _generate_title(body, turn_messages)
+            generated_title = title_service.generate_title(openai_client(body), body, turn_messages)
             if generated_title:
                 recorder.update_title(generated_title)
                 publish({"type": "title", "title": generated_title})

@@ -1,0 +1,168 @@
+"""Persistent cross-turn MCP stdio session pool.
+
+AnyIO-backed MCP context managers must be exited from the same asyncio Task
+that entered them. McpSessionPool uses one dedicated worker coroutine for the
+whole lifetime of the pool so open, invoke, and close all happen in the same
+Task. Do not replace the worker pattern with run_coroutine_threadsafe() per
+call unless you also preserve same-task cleanup semantics.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import threading
+
+log = logging.getLogger(__name__)
+
+
+class McpSessionPool:
+    """Reuse MCP stdio sessions for multiple tool calls across turns."""
+
+    def __init__(self, conv_id: str = "") -> None:
+        self.conv_id = conv_id
+        self._jobs: "queue.Queue[tuple]" | None = None
+        self._thread: threading.Thread | None = None
+        self._sessions: dict[str, dict] = {}
+        self._closed = False
+        self._lock = threading.Lock()
+
+    def __enter__(self) -> "McpSessionPool":
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+    def start(self) -> None:
+        if self._thread:
+            return
+        import queue
+
+        self._jobs = queue.Queue()
+        self._thread = threading.Thread(target=self._thread_main, name="mcp-session-pool", daemon=True)
+        self._thread.start()
+
+    def _thread_main(self) -> None:
+        try:
+            asyncio.run(self._worker())
+        except Exception:
+            log.exception("[mcp] session pool worker crashed")
+
+    async def _worker(self) -> None:
+        if self._jobs is None:
+            raise RuntimeError("MCP session pool was not started")
+
+        while True:
+            job = await asyncio.to_thread(self._jobs.get)
+            op = job[0]
+            if op == "invoke":
+                _, server_name, server_config, tool_name, arguments, future = job
+                try:
+                    result = await self._invoke(server_name, server_config, tool_name, arguments)
+                except Exception as exc:
+                    future.set_exception(exc)
+                else:
+                    future.set_result(result)
+            elif op == "close":
+                _, future = job
+                try:
+                    await self._close_async()
+                except Exception as exc:
+                    future.set_exception(exc)
+                else:
+                    future.set_result(None)
+                break
+
+    async def _get_session(self, server_name: str, server_config: dict):
+        if server_name in self._sessions:
+            return self._sessions[server_name]["session"]
+        return await self._open_session(server_name, server_config)
+
+    async def _open_session(self, server_name: str, server_config: dict):
+        """Open a brand-new stdio session and cache it."""
+        from mcp import ClientSession
+        from mcp.client.stdio import stdio_client
+        from mcp_service import _build_server_params
+
+        params = _build_server_params(server_name, server_config, conv_id=self.conv_id)
+        stdio_cm = stdio_client(params)
+        reader, writer = await stdio_cm.__aenter__()
+        session_cm = ClientSession(reader, writer)
+        session = await session_cm.__aenter__()
+        await session.initialize()
+        self._sessions[server_name] = {
+            "session": session,
+            "session_cm": session_cm,
+            "stdio_cm": stdio_cm,
+        }
+        return session
+
+    async def _invoke(self, server_name: str, server_config: dict, tool_name: str, arguments: dict) -> str:
+        session = await self._get_session(server_name, server_config)
+        try:
+            result = await session.call_tool(tool_name, arguments)
+        except Exception as exc:
+            # Session may have gone stale (e.g. container restarted between turns).
+            # Drop the cached entry and retry once with a fresh connection.
+            log.warning(
+                "[mcp] session for %r raised %s; dropping and retrying once",
+                server_name, exc,
+            )
+            await self._close_one_session(server_name)
+            session = await self._open_session(server_name, server_config)
+            result = await session.call_tool(tool_name, arguments)
+        return "\n".join(
+            c.text if hasattr(c, "text") else str(c)
+            for c in result.content
+        )
+
+    async def _close_one_session(self, server_name: str) -> None:
+        """Tear down and remove the cached session for a single server."""
+        entry = self._sessions.pop(server_name, None)
+        if entry is None:
+            return
+        try:
+            await entry["session_cm"].__aexit__(None, None, None)
+        except Exception:
+            log.exception("[mcp] error closing stale client session for %r", server_name)
+        try:
+            await entry["stdio_cm"].__aexit__(None, None, None)
+        except Exception:
+            log.exception("[mcp] error closing stale stdio session for %r", server_name)
+
+    def invoke_tool(self, server_name: str, server_config: dict, tool_name: str, arguments: dict) -> str:
+        if self._closed:
+            raise RuntimeError("MCP session pool is closed")
+        self.start()
+        if self._jobs is None:
+            raise RuntimeError("MCP session pool failed to start")
+
+        from concurrent.futures import Future
+
+        future: Future = Future()
+        with self._lock:
+            self._jobs.put(("invoke", server_name, server_config, tool_name, arguments, future))
+        # Block *outside* the lock. Holding a lock while waiting on a future is a
+        # deadlock risk: any code path that needs self._lock while this call is
+        # in-flight (e.g. a concurrent close()) would be permanently blocked.
+        return future.result()
+
+    async def _close_async(self) -> None:
+        for server_name in reversed(list(self._sessions)):
+            await self._close_one_session(server_name)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        if not self._thread:
+            return
+        if self._jobs is None:
+            raise RuntimeError("MCP session pool failed to start")
+
+        from concurrent.futures import Future
+
+        future: Future = Future()
+        self._jobs.put(("close", future))
+        future.result()
+        self._thread.join(timeout=2)
