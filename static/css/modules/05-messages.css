@@ -12,7 +12,7 @@
 .msg-time { margin-left: auto; color: var(--text3); font-size: .6rem; font-family: var(--font-mono); }
 .msg-footer { gap: 3px; margin-top: 6px; opacity: 0; display: flex; align-items: center; }
 .msg-row:hover .msg-footer { opacity: 1; }
-.msg-action-btn { gap: 3px; padding: 3px 5px; border: none; border-radius: 4px; color: var(--text3); background: none; }
+.msg-action-btn { padding: 3px 5px; border: none; border-radius: 4px; color: var(--text3); background: none; display: grid; place-items: center; }
 .msg-action-btn:hover { background: var(--surface); color: var(--text2); }
 .msg-action-btn svg { width: 16px; height: 16px; }
 .msg-content { color: var(--text); font-size: .9rem; font-weight: 300; line-height: 1.75; }
