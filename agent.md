@@ -1,6 +1,6 @@
 # Agent Guide for Lumen AI Chat
 
-This file is the working guide for agents modifying this repository. It reflects the current post-cleanup codebase, including server-side API provider settings, typed internal streaming events, cached conversation indexing, and the per-turn MCP session pool.
+This file is the working guide for agents modifying this repository. It reflects the current post-cleanup codebase, including server-side API provider settings, typed internal streaming events, cached conversation indexing, and the persistent cross-turn MCP session pool.
 
 ## Project at a glance
 
@@ -14,7 +14,7 @@ Lumen is a self-hosted Flask chat UI for OpenAI-compatible chat-completions APIs
 - Docker sandbox containers per conversation
 - MCP server configuration through `mcp.json` and the UI
 - MCP tool discovery, namespaced model-facing tool names, tool-call execution, approval/deny UI, and tool-result rendering
-- Per-turn MCP stdio session reuse through `McpSessionPool`
+- Persistent cross-turn MCP stdio session reuse through `McpSessionPool`
 - Image uploads stored by content hash
 - Regular file uploads stored in the conversation workspace
 - Markdown, code highlighting, KaTeX, voice input, theming, and conversation search
@@ -30,7 +30,7 @@ The app is intentionally lightweight: no database, no frontend framework, no bun
 ├── routes.py                      # HTTP API routes and SSE stream endpoint
 ├── chat_turn_service.py           # Long-running chat turn orchestration
 ├── streaming.py                   # Typed OpenAI streaming event generator + SSE helpers
-├── mcp_service.py                 # MCP config, tool discovery, invocation, per-turn session pool
+├── mcp_service.py                 # MCP config, tool discovery, invocation, persistent cross-turn session pool
 ├── mcp_adapters.py                # Host/container MCP launch helpers
 ├── container_service.py           # Docker container lifecycle and command wrapping
 ├── workspace_service.py           # Workspace listing, reading, upload, download path safety
@@ -235,7 +235,7 @@ Key responsibilities:
 - Detect streamed tool calls.
 - Pre-mount host volumes for all enabled MCP servers at turn start by calling `mcp_service.collect_all_extra_volumes()` and `container_service.ensure_container()`.
 - Request frontend approval for tools unless the server is set to auto-approve.
-- Invoke MCP tools through a per-turn `mcp_service.McpSessionPool` when tools are available.
+- Invoke MCP tools through a persistent `mcp_service.McpSessionPool` (one pool per conversation, kept alive across turns) when tools are available.
 - Append tool messages back into the API message history.
 - Loop until the model completes without more tool calls.
 - Emit final `assistant_done` and optional generated `title` events.
@@ -288,7 +288,7 @@ Do not restore the old internal SSE encode/decode round-trip. Keep stream intern
 
 #### `McpSessionPool`
 
-`McpSessionPool` reuses MCP stdio sessions across multiple tool calls in one chat turn.
+`McpSessionPool` reuses MCP stdio sessions across all tool calls for a conversation — the pool is kept alive between turns and only closed when the conversation's container is stopped or removed.
 
 Important implementation detail: AnyIO-backed MCP context managers must be exited from the same asyncio Task that entered them. The pool uses one dedicated worker coroutine for the whole turn so session open, tool invocation, `ClientSession.__aexit__`, and `stdio_client.__aexit__` happen in the same Task. Do not replace this with `run_coroutine_threadsafe()` per call unless you also preserve same-task cleanup semantics.
 

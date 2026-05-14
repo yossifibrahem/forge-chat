@@ -21,7 +21,7 @@ Lumen is built for developers who want a capable local AI chat application witho
 **MCP (Model Context Protocol)**
 - Add MCP servers through the UI or `mcp.json`
 - Tools are namespaced as `server_tool` to prevent name collisions across servers
-- Per-turn MCP stdio session pooling — sessions are opened once and reused across tool calls in a single turn
+- Persistent MCP stdio session pooling — sessions are opened once per conversation and reused across all turns until the container stops
 - Approve or deny individual tool calls; enable auto-approval per server
 - Tool activity renders inline: arguments, running state, and results
 
@@ -293,7 +293,7 @@ Click the stop button while a response is streaming. The server marks the stream
 | `routes.py` | Thin HTTP handlers delegating to service modules; streaming and cancellation state |
 | `chat_turn_service.py` | Full chat turn orchestration: streaming, tool approval, MCP calls, persistence |
 | `streaming.py` | Typed OpenAI streaming event generator; SSE serialization helpers |
-| `mcp_service.py` | MCP config, tool discovery, tool invocation, `McpSessionPool` for per-turn session reuse |
+| `mcp_service.py` | MCP config, tool discovery, tool invocation, `McpSessionPool` for persistent cross-turn session reuse |
 | `mcp_adapters.py` | Wraps MCP commands for Docker `exec`; extracts and mounts host volume paths |
 | `container_service.py` | Docker container lifecycle: create, start, stop, idle reaping, workspace management |
 | `store.py` | Filesystem persistence for conversations and images; cached conversation index |
@@ -305,7 +305,7 @@ A single chat turn in `chat_turn_service.py`:
 1. Build an OpenAI client from server-side config.
 2. Pre-mount MCP server volumes and ensure the conversation container is running.
 3. Stream model output via `streaming.py`; accumulate text and tool calls.
-4. For each tool call: request approval (unless auto-approved), invoke via `McpSessionPool`, append the tool result to message history.
+4. For each tool call: request approval (unless auto-approved), invoke via the persistent `McpSessionPool` (shared across turns for the conversation), append the tool result to message history.
 5. Loop until the model finishes without further tool calls.
 6. Emit `assistant_done` and optionally a generated `title` event.
 
