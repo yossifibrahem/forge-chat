@@ -5,13 +5,20 @@ run_persistent_chat_turn() requires a live OpenAI stream and is covered
 by the streaming integration tests. Everything tested here is a pure function
 or a thin stateful helper that does not touch the network.
 
-Functions under test:
+Functions under test (chat_turn_service):
   _parse_stream_payload   — typed dict event passthrough
-  _messages_to_text       — title-generation input formatter
-  _extract_title          — 3-path title extractor (tool_calls / XML)
   _safe_tool_args         — silent JSON parser for tool arguments
   _tool_call_message      — OpenAI tool-call message constructor
   TurnRecorder            — throttled persistence helper
+  _bare_tool_name         — server-namespace stripper
+
+Functions under test (title_service — stateless, independently importable):
+  _messages_to_text       — title-generation input formatter
+  _extract_title          — 3-path title extractor (tool_calls / XML)
+
+Note: title_service functions have their own dedicated test module
+(test_title_service.py).  The tests here exercise them via the title_service
+module directly, matching their new home after the split.
 """
 from __future__ import annotations
 
@@ -23,6 +30,7 @@ from unittest.mock import MagicMock, patch, call
 import pytest
 
 import chat_turn_service as svc
+import title_service
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +64,8 @@ class TestMessagesToText:
     """
     Input to the title-generation model. Must include only user/assistant turns,
     handle list-format content (vision messages), and strip formatting noise.
+
+    _messages_to_text now lives in title_service; tests use that module directly.
     """
 
     def test_simple_user_and_assistant_messages(self):
@@ -63,7 +73,7 @@ class TestMessagesToText:
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there"},
         ]
-        result = svc._messages_to_text(messages)
+        result = title_service._messages_to_text(messages)
         assert "user: Hello" in result
         assert "assistant: Hi there" in result
 
@@ -72,7 +82,7 @@ class TestMessagesToText:
             {"role": "system", "content": "You are helpful."},
             {"role": "user", "content": "Question"},
         ]
-        result = svc._messages_to_text(messages)
+        result = title_service._messages_to_text(messages)
         assert "system" not in result
         assert "Question" in result
 
@@ -81,7 +91,7 @@ class TestMessagesToText:
             {"role": "user", "content": "Run it"},
             {"role": "tool", "content": "result output"},
         ]
-        result = svc._messages_to_text(messages)
+        result = title_service._messages_to_text(messages)
         assert "result output" not in result
 
     def test_list_content_blocks_joined(self):
@@ -95,21 +105,21 @@ class TestMessagesToText:
                 ],
             }
         ]
-        result = svc._messages_to_text(messages)
+        result = title_service._messages_to_text(messages)
         assert "Describe this" in result
 
     def test_double_newlines_collapsed(self):
         messages = [{"role": "user", "content": "Line one\n\nLine two"}]
-        result = svc._messages_to_text(messages)
+        result = title_service._messages_to_text(messages)
         assert "\n\n" not in result
 
     def test_empty_messages_returns_empty_string(self):
-        assert svc._messages_to_text([]) == ""
+        assert title_service._messages_to_text([]) == ""
 
     def test_only_four_messages_consumed(self):
         """Only the first 4 messages are passed by the caller — function must not crash on fewer."""
         messages = [{"role": "user", "content": f"msg{i}"} for i in range(2)]
-        result = svc._messages_to_text(messages)
+        result = title_service._messages_to_text(messages)
         assert "msg0" in result
 
 
@@ -121,6 +131,8 @@ class TestExtractTitle:
     """
     Three distinct code paths exist because different model families return
     the set_title tool call in different formats.
+
+    _extract_title now lives in title_service; tests use that module directly.
     """
 
     def _tool_call_message(self, title: str) -> MagicMock:
@@ -139,26 +151,26 @@ class TestExtractTitle:
 
     def test_standard_tool_call_path(self):
         msg = self._tool_call_message("Docker Volume Permissions")
-        assert svc._extract_title(msg) == "Docker Volume Permissions"
+        assert title_service._extract_title(msg) == "Docker Volume Permissions"
 
     def test_reasoning_xml_tool_call_path(self):
         """Some reasoning models embed the call in <tool_call> XML in reasoning_content."""
         reasoning = '<tool_call>{"name": "set_title", "arguments": {"title": "JWT Token Bug"}}</tool_call>'
         msg = self._reasoning_message(reasoning)
-        assert svc._extract_title(msg) == "JWT Token Bug"
+        assert title_service._extract_title(msg) == "JWT Token Bug"
 
     def test_reasoning_parameter_xml_path(self):
         """Alternate XML format used by some models."""
         reasoning = "<parameter=title>Fibonacci in Python</parameter>"
         msg = self._reasoning_message(reasoning)
-        assert svc._extract_title(msg) == "Fibonacci in Python"
+        assert title_service._extract_title(msg) == "Fibonacci in Python"
 
     def test_no_tool_call_and_no_xml_raises(self):
         msg = MagicMock()
         msg.tool_calls = None
         msg.reasoning_content = "I was just thinking..."
         with pytest.raises(ValueError, match="tool call"):
-            svc._extract_title(msg)
+            title_service._extract_title(msg)
 
 
 # ---------------------------------------------------------------------------
