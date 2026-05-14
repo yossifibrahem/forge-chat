@@ -20,8 +20,13 @@ def _clear_persistent_pools(monkeypatch):
     The registry is module-level state in mcp_service.  Without this fixture,
     a pool created by one test could leak into the next test, causing
     unexpected reuse or interference.
+
+    Pools must be closed before the registry is replaced, not just discarded.
+    Discarding a live pool without closing it leaks its worker thread.
     """
     import mcp_service
+    # Close any pools left over from a previous test before wiping the registry.
+    mcp_service.close_all_persistent_pools()
     monkeypatch.setattr("mcp_service._persistent_pools", {})
 
 

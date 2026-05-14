@@ -5,6 +5,20 @@ that entered them. McpSessionPool uses one dedicated worker coroutine for the
 whole lifetime of the pool so open, invoke, and close all happen in the same
 Task. Do not replace the worker pattern with run_coroutine_threadsafe() per
 call unless you also preserve same-task cleanup semantics.
+
+Design note -- why asyncio.Queue + call_soon_threadsafe, not threading.Queue:
+The worker coroutine must never block the event loop thread. The original code
+used asyncio.to_thread(threading_queue.get) to avoid that, but to_thread()
+offloads onto the loop's default ThreadPoolExecutor whose threads are
+non-daemon -- an unclosed pool would leave a thread blocked on queue.get()
+forever, preventing process exit.
+
+The correct bridge between sync callers and an async worker is:
+  - asyncio.Queue for the worker to consume (pure coroutine await, no threads)
+  - loop.call_soon_threadsafe() for sync callers to enqueue jobs safely
+
+This eliminates executor threads entirely. The worker thread itself is already
+daemon=True, so process exit is never blocked.
 """
 from __future__ import annotations
 
@@ -20,7 +34,9 @@ class McpSessionPool:
 
     def __init__(self, conv_id: str = "") -> None:
         self.conv_id = conv_id
-        self._jobs: "queue.Queue[tuple]" | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._aqueue: asyncio.Queue | None = None
+        self._ready = threading.Event()
         self._thread: threading.Thread | None = None
         self._sessions: dict[str, dict] = {}
         self._closed = False
@@ -36,11 +52,9 @@ class McpSessionPool:
     def start(self) -> None:
         if self._thread:
             return
-        import queue
-
-        self._jobs = queue.Queue()
         self._thread = threading.Thread(target=self._thread_main, name="mcp-session-pool", daemon=True)
         self._thread.start()
+        self._ready.wait()  # block until the event loop and queue are initialised
 
     def _thread_main(self) -> None:
         try:
@@ -49,11 +63,15 @@ class McpSessionPool:
             log.exception("[mcp] session pool worker crashed")
 
     async def _worker(self) -> None:
-        if self._jobs is None:
-            raise RuntimeError("MCP session pool was not started")
+        # Initialise the asyncio.Queue and capture the running loop, then
+        # signal start() that it is safe to call call_soon_threadsafe().
+        self._aqueue = asyncio.Queue()
+        self._loop = asyncio.get_running_loop()
+        self._ready.set()
 
         while True:
-            job = await asyncio.to_thread(self._jobs.get)
+            # Pure coroutine await -- no executor threads, no blocking.
+            job = await self._aqueue.get()
             op = job[0]
             if op == "invoke":
                 _, server_name, server_config, tool_name, arguments, future = job
@@ -134,14 +152,19 @@ class McpSessionPool:
         if self._closed:
             raise RuntimeError("MCP session pool is closed")
         self.start()
-        if self._jobs is None:
+        if self._loop is None or self._aqueue is None:
             raise RuntimeError("MCP session pool failed to start")
 
         from concurrent.futures import Future
 
         future: Future = Future()
         with self._lock:
-            self._jobs.put(("invoke", server_name, server_config, tool_name, arguments, future))
+            # call_soon_threadsafe is the correct way to enqueue work from a
+            # sync thread onto a running asyncio event loop without blocking it.
+            self._loop.call_soon_threadsafe(
+                self._aqueue.put_nowait,
+                ("invoke", server_name, server_config, tool_name, arguments, future),
+            )
         # Block *outside* the lock. Holding a lock while waiting on a future is a
         # deadlock risk: any code path that needs self._lock while this call is
         # in-flight (e.g. a concurrent close()) would be permanently blocked.
@@ -157,12 +180,15 @@ class McpSessionPool:
         self._closed = True
         if not self._thread:
             return
-        if self._jobs is None:
+        if self._loop is None or self._aqueue is None:
             raise RuntimeError("MCP session pool failed to start")
 
         from concurrent.futures import Future
 
         future: Future = Future()
-        self._jobs.put(("close", future))
+        self._loop.call_soon_threadsafe(
+            self._aqueue.put_nowait,
+            ("close", future),
+        )
         future.result()
         self._thread.join(timeout=2)
