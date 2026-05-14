@@ -78,8 +78,8 @@ function createMessageAction(icon, onClick) {
 function createCopyAction(getText) {
   const btn = createMessageAction(ICONS.copy, () => {
     navigator.clipboard.writeText(getText());
-    btn.textContent = '✓ copied';
-    setTimeout(() => { btn.innerHTML = `${ICONS.copy}`; }, 1500);
+    btn.innerHTML = ICONS.check;
+    setTimeout(() => { btn.innerHTML = ICONS.copy; }, 1500);
   });
   return btn;
 }
