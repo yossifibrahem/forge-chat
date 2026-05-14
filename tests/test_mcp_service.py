@@ -363,3 +363,202 @@ class TestMcpSessionPool:
             "Probe thread could not acquire lock while invoke_tool() was in flight — "
             "lock was still held across future.result() (deadlock regression)"
         )
+
+    def test_stale_session_retry_succeeds_on_second_attempt(self, monkeypatch):
+        """
+        If a cached session raises on call_tool (simulating a dead docker exec
+        process), _invoke must drop the entry, open a fresh session, and retry.
+        The caller should receive the successful result from the second attempt.
+        """
+        import sys
+        import types
+        from types import SimpleNamespace
+
+        attempt = {"count": 0}
+
+        class FlakySession:
+            def __init__(self):
+                self.entered = 0
+                self.exited = 0
+                self.initialized = 0
+                self.enter_task = None
+
+            async def __aenter__(self):
+                self.entered += 1
+                self.enter_task = asyncio.current_task()
+                return self
+
+            async def __aexit__(self, *a):
+                assert asyncio.current_task() is self.enter_task
+                self.exited += 1
+
+            async def initialize(self):
+                self.initialized += 1
+
+            async def call_tool(self, tool_name, arguments):
+                attempt["count"] += 1
+                if attempt["count"] == 1:
+                    raise OSError("broken pipe")
+                return SimpleNamespace(content=[SimpleNamespace(text="ok")])
+
+        sessions_created = []
+
+        class FakeStdioCtx:
+            def __init__(self, params):
+                self.entered = 0
+                self.exited = 0
+                self.enter_task = None
+
+            async def __aenter__(self):
+                self.entered += 1
+                self.enter_task = asyncio.current_task()
+                return "reader", "writer"
+
+            async def __aexit__(self, *a):
+                assert asyncio.current_task() is self.enter_task
+                self.exited += 1
+
+        def fake_stdio_client(params):
+            return FakeStdioCtx(params)
+
+        def fake_client_session(reader, writer):
+            s = FlakySession()
+            sessions_created.append(s)
+            return s
+
+        mcp_module = types.ModuleType("mcp")
+        mcp_module.ClientSession = fake_client_session
+        mcp_module.StdioServerParameters = lambda **kwargs: kwargs
+        mcp_client_module = types.ModuleType("mcp.client")
+        mcp_stdio_module = types.ModuleType("mcp.client.stdio")
+        mcp_stdio_module.stdio_client = fake_stdio_client
+
+        monkeypatch.setitem(sys.modules, "mcp", mcp_module)
+        monkeypatch.setitem(sys.modules, "mcp.client", mcp_client_module)
+        monkeypatch.setitem(sys.modules, "mcp.client.stdio", mcp_stdio_module)
+        monkeypatch.setattr(mcp_service, "_build_server_params", lambda name, cfg, conv_id="": {})
+
+        with mcp_service.McpSessionPool(conv_id="conv-1") as pool:
+            result = pool.invoke_tool("srv", {}, "tool", {})
+
+        assert result == "ok"
+        assert attempt["count"] == 2, "expected exactly two call_tool attempts"
+        assert len(sessions_created) == 2, "expected a fresh session to be opened after the stale one"
+
+
+# ---------------------------------------------------------------------------
+# Persistent cross-turn pool registry
+# ---------------------------------------------------------------------------
+
+class TestPersistentPool:
+
+    def _install_fake_mcp(self, monkeypatch):
+        """Same minimal fake as TestMcpSessionPool._install_fake_mcp."""
+        import sys
+        import types
+        from types import SimpleNamespace
+
+        class FakeStdioCtx:
+            async def __aenter__(self): return "r", "w"
+            async def __aexit__(self, *a): pass
+
+        class FakeSession:
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): pass
+            async def initialize(self): pass
+            async def call_tool(self, name, args):
+                return SimpleNamespace(content=[SimpleNamespace(text="result")])
+
+        mcp_module = types.ModuleType("mcp")
+        mcp_module.ClientSession = lambda r, w: FakeSession()
+        mcp_module.StdioServerParameters = lambda **kwargs: kwargs
+        mcp_client_module = types.ModuleType("mcp.client")
+        mcp_stdio_module = types.ModuleType("mcp.client.stdio")
+        mcp_stdio_module.stdio_client = lambda params: FakeStdioCtx()
+
+        monkeypatch.setitem(sys.modules, "mcp", mcp_module)
+        monkeypatch.setitem(sys.modules, "mcp.client", mcp_client_module)
+        monkeypatch.setitem(sys.modules, "mcp.client.stdio", mcp_stdio_module)
+        monkeypatch.setattr(mcp_service, "_build_server_params", lambda name, cfg, conv_id="": {})
+
+    def test_get_persistent_pool_returns_same_instance_for_same_conv(self, monkeypatch):
+        self._install_fake_mcp(monkeypatch)
+        pool_a = mcp_service.get_persistent_pool("conv-1")
+        pool_b = mcp_service.get_persistent_pool("conv-1")
+        assert pool_a is pool_b
+        pool_a.close()
+
+    def test_get_persistent_pool_returns_different_instances_for_different_convs(self, monkeypatch):
+        self._install_fake_mcp(monkeypatch)
+        pool_a = mcp_service.get_persistent_pool("conv-1")
+        pool_b = mcp_service.get_persistent_pool("conv-2")
+        assert pool_a is not pool_b
+        pool_a.close()
+        pool_b.close()
+
+    def test_close_persistent_pool_removes_entry(self, monkeypatch):
+        self._install_fake_mcp(monkeypatch)
+        mcp_service.get_persistent_pool("conv-1")
+        mcp_service.close_persistent_pool("conv-1")
+        assert "conv-1" not in mcp_service._persistent_pools
+
+    def test_close_persistent_pool_is_idempotent_for_unknown_conv(self):
+        # Must not raise even if no pool exists for the conv_id.
+        mcp_service.close_persistent_pool("never-existed")
+
+    def test_get_persistent_pool_creates_fresh_pool_after_close(self, monkeypatch):
+        self._install_fake_mcp(monkeypatch)
+        pool_a = mcp_service.get_persistent_pool("conv-1")
+        mcp_service.close_persistent_pool("conv-1")
+        pool_b = mcp_service.get_persistent_pool("conv-1")
+        assert pool_a is not pool_b
+        pool_b.close()
+
+    def test_get_persistent_pool_replaces_closed_pool_automatically(self, monkeypatch):
+        """If a pool was closed externally, get_persistent_pool creates a fresh one."""
+        self._install_fake_mcp(monkeypatch)
+        pool_a = mcp_service.get_persistent_pool("conv-1")
+        # Manually mark it closed without going through close_persistent_pool.
+        pool_a._closed = True
+        pool_b = mcp_service.get_persistent_pool("conv-1")
+        assert pool_b is not pool_a
+        assert not pool_b._closed
+        pool_b.close()
+
+    def test_close_all_persistent_pools_clears_registry(self, monkeypatch):
+        self._install_fake_mcp(monkeypatch)
+        mcp_service.get_persistent_pool("conv-1")
+        mcp_service.get_persistent_pool("conv-2")
+        mcp_service.close_all_persistent_pools()
+        assert mcp_service._persistent_pools == {}
+
+    def test_pool_survives_across_simulated_turns(self, monkeypatch):
+        """
+        Simulate two consecutive turns for the same conversation.
+        The same pool instance must be returned both times, and sessions
+        inside must be reused (opened only once, not twice).
+        """
+        self._install_fake_mcp(monkeypatch)
+
+        open_counts = {"srv": 0}
+        original_open = mcp_service.McpSessionPool._open_session
+
+        async def counting_open(self_pool, server_name, server_config):
+            open_counts[server_name] = open_counts.get(server_name, 0) + 1
+            return await original_open(self_pool, server_name, server_config)
+
+        monkeypatch.setattr(mcp_service.McpSessionPool, "_open_session", counting_open)
+
+        # Turn 1
+        pool1 = mcp_service.get_persistent_pool("conv-1")
+        pool1.invoke_tool("srv", {}, "tool", {})
+
+        # Turn 2 — same pool, no close in between
+        pool2 = mcp_service.get_persistent_pool("conv-1")
+        pool2.invoke_tool("srv", {}, "tool", {})
+
+        assert pool1 is pool2
+        assert open_counts["srv"] == 1, (
+            f"expected session opened exactly once across two turns, got {open_counts['srv']}"
+        )
+        mcp_service.close_persistent_pool("conv-1")

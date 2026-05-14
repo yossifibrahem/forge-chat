@@ -174,6 +174,66 @@ async def invoke_tool(server_name: str, server_config: dict, tool_name: str, arg
         return f"Error calling tool '{tool_name}': {exc}"
 
 
+# ── Persistent cross-turn session pools ──────────────────────────────────────
+#
+# Instead of creating and destroying an McpSessionPool on every chat turn,
+# we keep one pool alive per conversation for the lifetime of its container.
+# This eliminates the per-turn "cold start" cost (e.g. `npx -y` downloading
+# the package inside the container) because the stdio session stays open
+# between turns.
+#
+# Lifecycle rules:
+#   - get_persistent_pool()       → returns (or creates) the pool for a conv
+#   - close_persistent_pool()     → called when a container is stopped/removed
+#   - close_all_persistent_pools()→ called on app shutdown
+#
+# The pool is invalidated (and re-created on next use) whenever the underlying
+# container is recreated, because the old stdio sessions point at dead
+# `docker exec` processes after a container restart.
+
+_persistent_pools: dict[str, "McpSessionPool"] = {}
+_persistent_pools_lock = threading.Lock()
+
+
+def get_persistent_pool(conv_id: str) -> "McpSessionPool":
+    """Return the long-lived McpSessionPool for this conversation, creating it if needed."""
+    with _persistent_pools_lock:
+        pool = _persistent_pools.get(conv_id)
+        if pool is None or pool._closed:
+            pool = McpSessionPool(conv_id)
+            pool.start()
+            _persistent_pools[conv_id] = pool
+        return pool
+
+
+def close_persistent_pool(conv_id: str) -> None:
+    """Close and discard the pool for a conversation.
+
+    Call this whenever the conversation's container is stopped or recreated so
+    the next tool call opens fresh sessions against the new container process.
+    Safe to call even if no pool exists for the conversation.
+    """
+    with _persistent_pools_lock:
+        pool = _persistent_pools.pop(conv_id, None)
+    if pool is not None:
+        try:
+            pool.close()
+        except Exception:
+            log.exception("[mcp] error closing persistent pool for conv %s", conv_id)
+
+
+def close_all_persistent_pools() -> None:
+    """Close every persistent pool. Call once on app shutdown."""
+    with _persistent_pools_lock:
+        items = list(_persistent_pools.items())
+        _persistent_pools.clear()
+    for conv_id, pool in items:
+        try:
+            pool.close()
+        except Exception:
+            log.exception("[mcp] error closing persistent pool for conv %s on shutdown", conv_id)
+
+
 # ── Sync bridge ───────────────────────────────────────────────────────────────
 
 # Shared executor for bridging async MCP calls into sync Flask code.
@@ -263,7 +323,10 @@ class McpSessionPool:
     async def _get_session(self, server_name: str, server_config: dict):
         if server_name in self._sessions:
             return self._sessions[server_name]["session"]
+        return await self._open_session(server_name, server_config)
 
+    async def _open_session(self, server_name: str, server_config: dict):
+        """Open a brand-new stdio session and cache it."""
         from mcp import ClientSession
         from mcp.client.stdio import stdio_client
 
@@ -282,11 +345,37 @@ class McpSessionPool:
 
     async def _invoke(self, server_name: str, server_config: dict, tool_name: str, arguments: dict) -> str:
         session = await self._get_session(server_name, server_config)
-        result = await session.call_tool(tool_name, arguments)
+        try:
+            result = await session.call_tool(tool_name, arguments)
+        except Exception as exc:
+            # The session may have gone stale (e.g. the container was restarted
+            # between turns).  Drop the cached entry and try once more with a
+            # fresh connection before propagating the error.
+            log.warning(
+                "[mcp] session for %r raised %s; dropping and retrying once",
+                server_name, exc,
+            )
+            await self._close_one_session(server_name)
+            session = await self._open_session(server_name, server_config)
+            result = await session.call_tool(tool_name, arguments)
         return "\n".join(
             c.text if hasattr(c, "text") else str(c)
             for c in result.content
         )
+
+    async def _close_one_session(self, server_name: str) -> None:
+        """Tear down and remove the cached session for a single server."""
+        entry = self._sessions.pop(server_name, None)
+        if entry is None:
+            return
+        try:
+            await entry["session_cm"].__aexit__(None, None, None)
+        except Exception:
+            log.exception("[mcp] error closing stale client session for %r", server_name)
+        try:
+            await entry["stdio_cm"].__aexit__(None, None, None)
+        except Exception:
+            log.exception("[mcp] error closing stale stdio session for %r", server_name)
 
     def invoke_tool(self, server_name: str, server_config: dict, tool_name: str, arguments: dict) -> str:
         if self._closed:
@@ -306,16 +395,8 @@ class McpSessionPool:
         return future.result()
 
     async def _close_async(self) -> None:
-        for entry in reversed(list(self._sessions.values())):
-            try:
-                await entry["session_cm"].__aexit__(None, None, None)
-            except Exception:
-                log.exception("[mcp] error closing client session")
-            try:
-                await entry["stdio_cm"].__aexit__(None, None, None)
-            except Exception:
-                log.exception("[mcp] error closing stdio session")
-        self._sessions.clear()
+        for server_name in reversed(list(self._sessions)):
+            await self._close_one_session(server_name)
 
     def close(self) -> None:
         if self._closed:

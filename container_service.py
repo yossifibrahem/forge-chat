@@ -72,6 +72,20 @@ def _run(args: list[str]) -> subprocess.CompletedProcess:
 from docker_path_utils import parse_volume_source
 import advanced_config as _adv_cfg
 
+# mcp_service is imported lazily to avoid the circular import:
+# mcp_service → mcp_adapters → container_service → mcp_service.
+
+def _invalidate_mcp_pool(conv_id: str) -> None:
+    """Close the persistent MCP session pool for a conversation.
+
+    Called whenever the container process is stopped or removed so that
+    cached stdio sessions (which point at dead docker-exec processes) are
+    discarded before the next tool call.
+    """
+    import mcp_service
+    mcp_service.close_persistent_pool(conv_id)
+
+
 # Internal alias kept so the rest of this module can call _volume_source
 # without knowing about docker_path_utils.
 _volume_source = parse_volume_source
@@ -198,6 +212,8 @@ def stop_container_process(conv_id: str) -> None:
         log.warning("[container] could not stop %s: %s", name, result.stderr.strip())
     else:
         log.info("[container] stopped %s", name)
+    # The container process is gone; any open MCP stdio sessions are dead.
+    _invalidate_mcp_pool(conv_id)
 
 
 def stop_container(conv_id: str) -> None:
@@ -209,6 +225,9 @@ def stop_container(conv_id: str) -> None:
         log.warning("[container] could not remove %s: %s", name, result.stderr.strip())
     else:
         log.info("[container] removed %s", name)
+    # Invalidate any cached MCP sessions — they point at dead docker-exec
+    # processes after the container is gone.
+    _invalidate_mcp_pool(conv_id)
 
 
 def cleanup_stale(known_ids: list[str]) -> list[str]:

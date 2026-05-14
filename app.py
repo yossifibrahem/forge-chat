@@ -18,6 +18,7 @@ from flask_cors import CORS
 
 from routes import blueprint
 import container_service
+import mcp_service
 
 log = logging.getLogger(__name__)
 
@@ -134,6 +135,10 @@ def _shutdown_containers() -> None:
     if _shutdown_done:
         return
     _shutdown_done = True
+    try:
+        mcp_service.close_all_persistent_pools()
+    except Exception as exc:
+        log.warning("[shutdown] MCP pool teardown failed: %s", exc)
     try:
         stopped = container_service.stop_all_containers()
         if stopped:

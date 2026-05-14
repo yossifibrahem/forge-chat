@@ -13,6 +13,18 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 
+@pytest.fixture(autouse=True)
+def _clear_persistent_pools(monkeypatch):
+    """Reset the persistent MCP session pool registry before every test.
+
+    The registry is module-level state in mcp_service.  Without this fixture,
+    a pool created by one test could leak into the next test, causing
+    unexpected reuse or interference.
+    """
+    import mcp_service
+    monkeypatch.setattr("mcp_service._persistent_pools", {})
+
+
 # ---------------------------------------------------------------------------
 # Filesystem isolation
 # ---------------------------------------------------------------------------
