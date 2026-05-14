@@ -50,14 +50,20 @@ def invalidate_index() -> None:
         _index = None
 
 
+def _build_index_summaries() -> list[dict]:
+    summaries = []
+    paths = sorted(CONVERSATIONS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for path in paths:
+        summary = _conversation_summary(path)
+        if summary:
+            summaries.append(summary)
+    return summaries
+
+
 def _rebuild_index() -> None:
     global _index
+    summaries = _build_index_summaries()
     with _index_lock:
-        summaries = []
-        for path in sorted(CONVERSATIONS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-            summary = _conversation_summary(path)
-            if summary:
-                summaries.append(summary)
         _index = summaries
 
 
@@ -126,9 +132,16 @@ def working_directory(conv_id: str) -> Path:
 
 def list_all() -> list[dict]:
     """Return cached conversation summaries sorted by most-recently modified."""
+    global _index
+    with _index_lock:
+        if _index is not None:
+            return list(_index)
+
+    summaries = _build_index_summaries()
+
     with _index_lock:
         if _index is None:
-            _rebuild_index()
+            _index = summaries
         return list(_index or [])
 
 

@@ -64,7 +64,6 @@ def stream_chat_completion(
 
         for chunk in openai_stream:
             if cancel_event.is_set():
-                openai_stream.close()
                 break
 
             delta = chunk.choices[0].delta if chunk.choices else None
@@ -95,6 +94,12 @@ def stream_chat_completion(
     except Exception as exc:
         yield {"type": "error", "message": str(exc)}
         yield {"type": "done"}
+    finally:
+        if openai_stream is not None:
+            try:
+                openai_stream.close()
+            except Exception:
+                pass
 
 
 def make_streaming_response(generator: Generator) -> Response:

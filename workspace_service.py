@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import mimetypes
-import os
 import re
 from pathlib import Path
 from typing import Iterable
@@ -19,18 +18,7 @@ _TEXT_EXTENSIONS = {
 _SAFE_UPLOAD_NAME = re.compile(r"[^A-Za-z0-9._ -]+")
 
 
-def _env_int(name: str, default: int) -> int:
-    try:
-        return int(os.getenv(name, str(default)))
-    except ValueError:
-        return default
-
-
 import advanced_config as _adv_cfg
-
-MAX_PREVIEW_BYTES = _env_int("LUMEN_MAX_FILE_PREVIEW_BYTES", 512 * 1024)
-MAX_LIST_ENTRIES = _env_int("LUMEN_MAX_FILE_LIST_ENTRIES", 500)
-MAX_UPLOAD_BYTES = _env_int("LUMEN_MAX_UPLOAD_BYTES", 50 * 1024 * 1024)
 
 
 def _file_limits() -> tuple[int, int, int]:

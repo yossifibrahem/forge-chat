@@ -62,8 +62,17 @@ function _cacheSet(ref, url) {
 async function imageRefToDataUrl(ref) {
   const cached = _cacheGet(ref);
   if (cached !== undefined) return cached;
+
   const resp = await fetch(`/api/images/${ref}`);
+  if (!resp.ok) {
+    throw new Error(`Image fetch failed for ${ref}: HTTP ${resp.status}`);
+  }
+
   const blob = await resp.blob();
+  if (!blob.type || !blob.type.startsWith('image/')) {
+    throw new Error(`Image fetch failed for ${ref}: response was not an image`);
+  }
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload  = () => {

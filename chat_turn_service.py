@@ -54,7 +54,11 @@ def _request_tool_approval(
         wait_event.wait(timeout=0.5)
 
     with _pending_approvals_lock:
-        _pending_approvals.get(stream_id, {}).pop(call_id, None)
+        pending_for_stream = _pending_approvals.get(stream_id)
+        if pending_for_stream is not None:
+            pending_for_stream.pop(call_id, None)
+            if not pending_for_stream:
+                _pending_approvals.pop(stream_id, None)
 
     if cancel_event.is_set():
         return False

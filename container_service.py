@@ -321,18 +321,32 @@ def _reap_once() -> None:
     idle_timeout = _adv_cfg.load_advanced_config()["container_idle_timeout"]
     if idle_timeout <= 0:
         return
+
     now = time.monotonic()
     with _last_used_lock:
         candidates = [
-            cid for cid, ts in _last_used.items()
+            (cid, ts) for cid, ts in _last_used.items()
             if cid != DISCOVERY_CONTAINER_ID and (ts <= 0 or now - ts > idle_timeout)
         ]
-    for conv_id in candidates:
+
+    for conv_id, candidate_ts in candidates:
+        with _last_used_lock:
+            current_ts = _last_used.get(conv_id)
+            current_now = time.monotonic()
+            if (
+                current_ts is None
+                or current_ts != candidate_ts
+                or (current_ts > 0 and current_now - current_ts <= idle_timeout)
+            ):
+                continue
+
         if get_status(conv_id) == "running":
             log.info("[container] idle timeout reached for %s; stopping", conv_id)
             stop_container_process(conv_id)
+
         with _last_used_lock:
-            _last_used.pop(conv_id, None)
+            if _last_used.get(conv_id) == candidate_ts:
+                _last_used.pop(conv_id, None)
 
 
 def _reap_idle_containers() -> None:

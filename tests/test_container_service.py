@@ -240,7 +240,7 @@ class TestReapOnce:
 
     def test_stops_idle_running_container(self, monkeypatch):
         stopped = []
-        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service._adv_cfg, "load_advanced_config", lambda: {"container_idle_timeout": 300})
         monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
         monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
 
@@ -250,7 +250,7 @@ class TestReapOnce:
         assert "old-conv" in stopped
 
     def test_removes_reaped_entry_from_last_used(self, monkeypatch):
-        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service._adv_cfg, "load_advanced_config", lambda: {"container_idle_timeout": 300})
         monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
         monkeypatch.setattr(container_service, "stop_container_process", lambda cid: None)
 
@@ -262,7 +262,7 @@ class TestReapOnce:
     def test_skips_non_idle_container(self, monkeypatch):
         import time
         stopped = []
-        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service._adv_cfg, "load_advanced_config", lambda: {"container_idle_timeout": 300})
         monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
         monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
 
@@ -274,7 +274,7 @@ class TestReapOnce:
 
     def test_skips_already_stopped_container(self, monkeypatch):
         stopped = []
-        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service._adv_cfg, "load_advanced_config", lambda: {"container_idle_timeout": 300})
         monkeypatch.setattr(container_service, "get_status", lambda cid: "stopped")
         monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
 
@@ -286,7 +286,7 @@ class TestReapOnce:
 
     def test_skips_discovery_container(self, monkeypatch):
         stopped = []
-        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service._adv_cfg, "load_advanced_config", lambda: {"container_idle_timeout": 300})
         monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
         monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
 
@@ -297,7 +297,7 @@ class TestReapOnce:
 
     def test_disabled_when_idle_timeout_zero(self, monkeypatch):
         stopped = []
-        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 0)
+        monkeypatch.setattr(container_service._adv_cfg, "load_advanced_config", lambda: {"container_idle_timeout": 0})
         monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
         monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
 
@@ -309,7 +309,7 @@ class TestReapOnce:
     def test_only_reaps_idle_not_fresh(self, monkeypatch):
         import time
         stopped = []
-        monkeypatch.setattr(container_service, "IDLE_TIMEOUT", 300)
+        monkeypatch.setattr(container_service._adv_cfg, "load_advanced_config", lambda: {"container_idle_timeout": 300})
         monkeypatch.setattr(container_service, "get_status", lambda cid: "running")
         monkeypatch.setattr(container_service, "stop_container_process", lambda cid: stopped.append(cid))
 

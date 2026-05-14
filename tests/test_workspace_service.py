@@ -208,8 +208,8 @@ class TestReadFile:
         assert status == 400
 
     def test_file_exceeding_max_preview_bytes_returns_previewable_false(self, tmp_lumen, monkeypatch):
-        """Files larger than MAX_PREVIEW_BYTES must not have their content returned."""
-        monkeypatch.setattr("workspace_service.MAX_PREVIEW_BYTES", 10)
+        """Files larger than the configured preview limit must not have their content returned."""
+        monkeypatch.setattr("workspace_service._file_limits", lambda: (10, 500, 50 * 1024 * 1024))
         conv_id, root = _make_workspace(tmp_lumen)
         (root / "big.txt").write_text("x" * 100)
         with patch("workspace_service.workspace_root", return_value=root):
@@ -331,7 +331,7 @@ class TestSaveUploads:
 
     def test_file_exceeding_limit_returns_413_and_cleans_up(self, tmp_lumen):
         conv_id, root = _make_workspace(tmp_lumen)
-        large_content = b"x" * (workspace_service.MAX_UPLOAD_BYTES + 1)
+        large_content = b"x" * (workspace_service._file_limits()[2] + 1)
         f = self._make_fake_file("big.bin", large_content)
         with patch("workspace_service.workspace_root", return_value=root), \
              patch("store.working_directory", return_value=root):
@@ -344,7 +344,7 @@ class TestSaveUploads:
         """When file N exceeds the limit, files 0..N-1 must also be deleted."""
         conv_id, root = _make_workspace(tmp_lumen)
         good = self._make_fake_file("ok.txt", b"small")
-        bad = self._make_fake_file("big.bin", b"x" * (workspace_service.MAX_UPLOAD_BYTES + 1))
+        bad = self._make_fake_file("big.bin", b"x" * (workspace_service._file_limits()[2] + 1))
         with patch("workspace_service.workspace_root", return_value=root), \
              patch("store.working_directory", return_value=root):
             result, status = workspace_service.save_uploads(conv_id, [good, bad])

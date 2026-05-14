@@ -41,20 +41,21 @@ def load_config(*, refresh: bool = False) -> dict:
         ):
             return _config_cache
 
-        if not MCP_CONFIG_FILE.exists():
-            _config_cache = {"mcpServers": {}}
-            _config_cache_at = now
-            _config_cache_path = MCP_CONFIG_FILE
-            return _config_cache
+    if not MCP_CONFIG_FILE.exists():
+        config = {"mcpServers": {}}
+    else:
         try:
             config = json.loads(MCP_CONFIG_FILE.read_text())
         except (OSError, json.JSONDecodeError) as exc:
             log.warning("[mcp] could not read %s: %s", MCP_CONFIG_FILE, exc)
             config = {"mcpServers": {}}
-        if not isinstance(config, dict) or not isinstance(config.get("mcpServers", {}), dict):
-            config = {"mcpServers": {}}
+
+    if not isinstance(config, dict) or not isinstance(config.get("mcpServers", {}), dict):
+        config = {"mcpServers": {}}
+
+    with _config_cache_lock:
         _config_cache = config
-        _config_cache_at = now
+        _config_cache_at = time.monotonic()
         _config_cache_path = MCP_CONFIG_FILE
         return config
 
