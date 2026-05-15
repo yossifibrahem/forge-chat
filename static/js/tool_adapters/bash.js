@@ -13,6 +13,8 @@ import { registerAdapter } from './registry.js';
 registerAdapter({
   tools: ['bash_tool'],
 
+  usingLabel: 'Running command',
+
   /**
    * Show the command inline in the strip header.
    * @param {Object} args

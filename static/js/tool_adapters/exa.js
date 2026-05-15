@@ -7,9 +7,6 @@
  *   • web_search_advanced_exa — search with full filter/date/domain control
  *   • get_code_context_exa    — code-focused search across docs and repos
  *
- * Deprecated tools are also listed so the strip still shows a sensible
- * label if an older server config calls them.
- *
  * Styles are injected into <head> once on first use — nothing goes in main.css.
  */
 
@@ -202,13 +199,9 @@ registerAdapter({
     'web_search_exa',
     'web_search_advanced_exa',
     'get_code_context_exa',
-    // deprecated — kept so old configs still render correctly
-    'deep_search_exa',
-    'company_research_exa',
-    'people_search_exa',
-    'linkedin_search_exa',
   ],
 
+  usingLabel: 'Searching the web',
   labelArg: 'query',
 
   getMetaText(args) {
@@ -222,6 +215,8 @@ registerAdapter({
 
 registerAdapter({
   tools: ['web_fetch_exa'],
+
+  usingLabel: 'Fetching pages',
 
   getMetaText(args) {
     const list = Array.isArray(args.urls)
@@ -242,10 +237,12 @@ function tryParseUrls(str) {
 
 registerAdapter({
   tools: ['deep_researcher_start'],
+  usingLabel: 'Starting deep research',
   getMetaText(args) { return args.query ? String(args.query) : ''; },
 });
 
 registerAdapter({
   tools: ['deep_researcher_check'],
+  usingLabel: 'Checking research status',
   getMetaText(args) { return args.jobId ? `job ${args.jobId}` : ''; },
 });

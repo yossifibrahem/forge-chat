@@ -9,6 +9,10 @@
  *     That argument is also stripped from the displayed args block.
  *     e.g. most tools use 'description'; Exa uses 'query'.
  *
+ *   usingLabel: 'Searching the web'  (string)
+ *     Static label shown in the "using" strip state before any arguments are known.
+ *     Falls back to the bare tool name when omitted.
+ *
  *   getMetaText(args)          → string
  *     Short inline preview shown next to the label in the strip header
  *     (e.g. the command for bash, the file path for filesystem tools).
@@ -39,6 +43,9 @@ const _registry = new Map();
  *
  * @param {Object}   adapter
  * @param {string[]} adapter.tools          - Tool names this adapter handles.
+ * @param {string}   [adapter.usingLabel]   - Static label shown in the "using" (pre-args) strip state.
+ *                                            Defaults to the bare tool name when omitted.
+ *                                            Example: 'Searching the web', 'Running command'.
  * @param {string}   [adapter.labelArg]     - Arg name used as the strip header label (default: 'description').
  *                                            That arg is also hidden from the expanded args block.
  *                                            Set this when your tool uses a different key, e.g. 'query', 'command', 'url'.

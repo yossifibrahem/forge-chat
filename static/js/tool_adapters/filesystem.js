@@ -8,19 +8,31 @@
  *
  * The file path is shown as the strip meta-text so the active file is
  * immediately visible without expanding the arguments block.
+ * Each tool gets its own usingLabel to reflect what it is actually doing.
  */
 
 import { registerAdapter } from './registry.js';
 
-registerAdapter({
-  tools: ['view', 'create_file', 'str_replace'],
-
-  /**
-   * Show the file path inline in the strip header.
-   * @param {Object} args
-   * @returns {string}
-   */
+const pathMetaText = {
   getMetaText(args) {
     return args.path ? String(args.path) : '';
   },
+};
+
+registerAdapter({
+  tools: ['view'],
+  usingLabel: 'Reading file',
+  ...pathMetaText,
+});
+
+registerAdapter({
+  tools: ['create_file'],
+  usingLabel: 'Creating file',
+  ...pathMetaText,
+});
+
+registerAdapter({
+  tools: ['str_replace'],
+  usingLabel: 'Editing file',
+  ...pathMetaText,
 });

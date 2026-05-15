@@ -16,6 +16,11 @@ export function getToolDisplayLabel(toolName, args = {}) {
   return label || toolName;
 }
 
+export function getToolUsingLabel(toolName) {
+  const adapter = adapterFor(toolName);
+  return adapter?.usingLabel ?? '';
+}
+
 export function getToolMetaText(toolName, args = {}) {
   const adapter = adapterFor(toolName);
   return adapter?.getMetaText?.(args) ?? '';

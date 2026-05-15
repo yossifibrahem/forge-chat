@@ -5,7 +5,7 @@ import { ICONS } from './icons.js';
 import { state } from './state.js';
 import { escapeHtml } from './format.js';
 import {
-  getToolDisplayLabel, getToolMetaText, formatArgsHtml, renderToolResultHtml, visibleToolArgs,
+  getToolDisplayLabel, getToolUsingLabel, formatArgsHtml, renderToolResultHtml, visibleToolArgs,
 } from './mcp_tool_ui.js';
 import { scrollToBottom } from './renderer_core.js';
 import { prepareAssistantRow, attachCollapsible, tryGroupBlock, updateGroupLabel } from './renderer_groups.js';
@@ -98,10 +98,11 @@ export function createToolStrip(toolName, displayName = '') {
   const row = prepareAssistantRow();
   const strip = createElement('div', { className: 'tool-strip tool-strip-using' });
   strip.dataset.toolName = toolName;
-  strip.dataset.displayName = displayName || toolName;
+  const usingLabel = getToolUsingLabel(toolName) || displayName || toolName;
+  strip.dataset.displayName = usingLabel;
   strip.innerHTML = `
     <span class="tool-icon">${getToolIconSvg(toolName)}</span>
-    <span class="tui-name">${escapeHtml(displayName || toolName)}</span>
+    <span class="tui-name">${escapeHtml(usingLabel)}</span>
     <span class="thinking-pulse"></span>`;
   row.appendChild(strip);
   if (state.groupSequentialBlocks) tryGroupBlock(strip);
@@ -116,7 +117,6 @@ export function toolStripSetApproval(strip, call) {
     try { args = JSON.parse(call.function.arguments || '{}'); } catch {}
     const hasArgs = Object.keys(args).length > 0;
     const displayName = getToolDisplayLabel(call.function.name, args);
-    const metaText = getToolMetaText(call.function.name, args);
     strip.dataset.toolName = call.function.name;
     strip.dataset.displayName = displayName;
 
@@ -127,7 +127,7 @@ export function toolStripSetApproval(strip, call) {
           <span class="tc-item-chevron">${ICONS.chevronDown}</span>
           <span class="tool-icon">${getToolIconSvg(call.function.name)}</span>
           <span class="tc-item-name">${escapeHtml(displayName)}</span>
-          ${metaText ? `<span class="tc-item-noargs">${escapeHtml(metaText)}</span>` : (hasArgs ? '' : '<span class="tc-item-noargs">no arguments</span>')}
+          ${!hasArgs ? '<span class="tc-item-noargs">no arguments</span>' : ''}
         </button>
         <span class="tc-actions">
           <button class="tc-allow">${ICONS.check} allow</button>
