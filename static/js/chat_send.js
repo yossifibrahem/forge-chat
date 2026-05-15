@@ -44,7 +44,7 @@ export async function sendMessage(userText, deps) {
   let uploadedFiles = [];
   try {
     uploadedFiles = await uploadConversationFiles(turn.convId, filesToSend);
-    if (deps.isTurnVisible(turn)) refreshFilePanel({ keepPreview: true }).catch(() => {});
+    if (uploadedFiles.length && deps.isTurnVisible(turn)) refreshFilePanel({ keepPreview: true }).catch(() => {});
   } catch (err) {
     restorePendingAttachments(attachmentsToSend);
     deps.setStreaming(false);
@@ -106,4 +106,3 @@ export async function sendMessage(userText, deps) {
 
   await deps.runAssistantTurnAndPersist(turn);
 }
-

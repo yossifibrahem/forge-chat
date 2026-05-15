@@ -73,6 +73,7 @@ function createStreamContext(turn) {
     toolRunningIndex:   0,
     toolResultIndex:    0,
     assistantDone:      false,
+    hadToolUse:         false,
     isVisible:          () => isTurnVisible(turn),
     getContentEl:       () => {
       if (!ctx.contentEl && isTurnVisible(turn)) ctx.contentEl = createStreamingMessage();
