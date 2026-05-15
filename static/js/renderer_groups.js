@@ -6,7 +6,6 @@ import { ICONS } from './icons.js';
 import { state } from './state.js';
 import { escapeHtml } from './format.js';
 import { messagesEl, createMessageRow } from './renderer_core.js';
-import { ICONS as _icons } from './icons.js';
 
 export function attachCollapsible(block, { headerSelector, bodySelector, chevronSelector, markManualToggle = false }) {
   const header = block.querySelector(headerSelector);

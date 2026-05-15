@@ -5,17 +5,13 @@ import { state } from './state.js';
 import { isServerEnabled, isServerAutoApprove } from './mcp.js';
 import { buildAppSystemPrompt } from './app_policy.js';
 
-function namespacedToolName(tool) {
-  return `${tool.server}_${tool.name}`;
-}
-
 export function buildToolsPayload() {
   return state.mcpTools
     .filter(tool => isServerEnabled(tool.server))
     .map(tool => ({
       type: 'function',
       function: {
-        name:        namespacedToolName(tool),
+        name:        tool.name,
         description: tool.description || tool.name,
         parameters:  tool.inputSchema || { type: 'object', properties: {} },
       },
@@ -26,8 +22,7 @@ export function buildMcpToolMetaPayload() {
   return state.mcpTools
     .filter(tool => isServerEnabled(tool.server))
     .map(tool => ({
-      name: namespacedToolName(tool),
-      originalName: tool.name,
+      name: tool.name,
       server: tool.server,
       autoApprove: isServerAutoApprove(tool.server),
     }));

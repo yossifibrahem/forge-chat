@@ -22,4 +22,4 @@ import './agent_tools.js';
 import './exa.js';
 
 // ── Re-export the registry API ────────────────────────────────────────────────
-export { adapterFor, registeredTools } from './registry.js';
+export { adapterFor } from './registry.js';

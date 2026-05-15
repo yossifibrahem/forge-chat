@@ -70,18 +70,6 @@ def _tool_meta_by_name(body: dict) -> dict:
     return {tool.get("name"): tool for tool in body.get("mcp_tool_meta", []) if tool.get("name")}
 
 
-def _bare_tool_name(name: str, meta: dict | None = None) -> str:
-    """Strip the server_ namespace prefix, using originalName from meta if available."""
-    if meta and meta.get("originalName"):
-        return meta["originalName"]
-    if meta and meta.get("server"):
-        prefix = meta["server"] + "_"
-        if name.startswith(prefix):
-            return name[len(prefix):]
-    if "_" in name:
-        return name.split("_", 1)[1]
-    return name
-
 
 def _tool_call_message(calls: list, content: str | None) -> dict:
     return {
@@ -110,18 +98,17 @@ def _safe_tool_args(raw_args: str) -> dict:
 
 def _run_mcp_call(tool_meta: dict, call: dict, session_pool) -> tuple[dict, str]:
     name = call.get("function", {}).get("name", "")
-    dispatch_name = _bare_tool_name(name, tool_meta)
     args = _safe_tool_args(call.get("function", {}).get("arguments", "{}"))
     server_name = tool_meta.get("server", "")
     server_config = mcp_service.find_server(server_name)
     if not server_config:
-        return args, f"Error calling tool '{dispatch_name}': MCP server '{server_name}' not found"
+        return args, f"Error calling tool '{name}': MCP server '{server_name}' not found"
     try:
-        result = session_pool.invoke_tool(server_name, server_config, dispatch_name, args)
+        result = session_pool.invoke_tool(server_name, server_config, name, args)
     except ContainerConversationRequired as exc:
         result = str(exc)
     except Exception as exc:
-        result = f"Error calling tool '{dispatch_name}': {exc}"
+        result = f"Error calling tool '{name}': {exc}"
     return args, result
 
 
@@ -217,10 +204,6 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
                     tool_calls = event.get("calls") or []
                     continue
 
-                if etype == "tool_start":
-                    meta = tool_meta.get(event.get("name", ""), {})
-                    event = {**event, "name": _bare_tool_name(event.get("name", ""), meta)}
-
                 if etype == "reasoning":
                     acc_reasoning += event.get("content", "")
                     recorder.save(display_log, acc_reasoning, acc_text)
@@ -247,19 +230,18 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
                 for call in tool_calls:
                     name = call.get("function", {}).get("name", "")
                     meta = tool_meta.get(name, {})
-                    display_name = _bare_tool_name(name, meta)
                     call_id = call.get("id", "")
                     args_preview = _safe_tool_args(call.get("function", {}).get("arguments", "{}"))
 
                     if not meta.get("autoApprove", False):
                         approved = tool_approval.request_tool_approval(
-                            stream_id, call_id, display_name, args_preview, publish, cancel_event
+                            stream_id, call_id, name, args_preview, publish, cancel_event
                         )
                         if not approved or cancel_event.is_set():
                             result = "Tool call denied by user."
                             deny_event = {
                                 "type": "tool_result",
-                                "name": display_name,
+                                "name": name,
                                 "args": args_preview,
                                 "result": result,
                                 "denied": True,
@@ -271,12 +253,12 @@ def run_persistent_chat_turn(body: dict, cancel_event: threading.Event, stream_i
                             publish(deny_event)
                             continue
 
-                    publish({"type": "tool_running", "name": display_name, "args": args_preview})
+                    publish({"type": "tool_running", "name": name, "args": args_preview})
 
                     args, result = _run_mcp_call(meta, call, session_pool)
                     event = {
                         "type": "tool_result",
-                        "name": display_name,
+                        "name": name,
                         "args": args,
                         "result": result,
                     }

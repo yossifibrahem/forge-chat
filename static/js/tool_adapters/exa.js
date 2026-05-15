@@ -4,8 +4,6 @@
  * Covers the active tools exposed by @exa-ai/mcp-server:
  *   • web_search_exa          — semantic web search, returns highlights
  *   • web_fetch_exa           — full-page crawl of one or more URLs
- *   • web_search_advanced_exa — search with full filter/date/domain control
- *   • get_code_context_exa    — code-focused search across docs and repos
  *
  * Styles are injected into <head> once on first use — nothing goes in main.css.
  */
