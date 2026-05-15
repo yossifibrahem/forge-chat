@@ -62,7 +62,7 @@ def generate_title(client, body: dict, messages: list) -> str | None:
                 {
                     "role": "system",
                     "content": (
-                        "Call set_title with a 2–5 word Title Case title for this conversation.\n"
+                        "Call set_title with a 2–5 word Title Case title for this conversation turn only.\n"
                         "The title must name the specific subject, not describe the interaction.\n\n"
                         "Good: 'Fibonacci Sequence in Python', 'Docker Volume Permissions', 'JWT Token Expiry Bug'\n"
                         "Bad: 'Coding Help' (too vague), 'Asking About Docker' (action not topic), 'General Question' (meaningless)"
