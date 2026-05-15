@@ -14,7 +14,7 @@
 .msg-row:hover .msg-footer { opacity: 1; }
 .msg-action-btn { padding: 3px 5px; border: none; border-radius: 4px; color: var(--text3); background: none; display: grid; place-items: center; }
 .msg-action-btn:hover { background: var(--surface); color: var(--text2); }
-.msg-action-btn svg { width: 16px; height: 16px; }
+.msg-action-btn svg { width: 14px; height: 14px; }
 .msg-content { color: var(--text); font-size: .9rem; font-weight: 300; line-height: 1.75; }
 .msg-content p { margin-bottom: .65em; }
 .msg-content p:last-child { margin-bottom: 0; }
