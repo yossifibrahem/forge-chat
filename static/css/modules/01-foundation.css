@@ -19,6 +19,8 @@ body {
   color: var(--text);
   display: flex;
   position: relative;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 body::before {
   content: '';
