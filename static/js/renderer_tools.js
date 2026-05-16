@@ -186,24 +186,11 @@ export function toolStripSetRunning(strip, args = {}) {
   strip.className = 'tool-strip tool-strip-running';
   strip.innerHTML = `
     <div class="tool-strip-running-row">
-      ${hasArgs
-        ? `<button class="tc-item-header">
-             <span class="tc-item-chevron">${ICONS.chevronRight}</span>
-             <span class="tool-icon">${getToolIconSvg(name)}</span>
-             <span class="tui-name">${escapeHtml(displayName)}</span>
-           </button>`
-        : `<span class="tool-icon">${getToolIconSvg(name)}</span>
-           <span class="tui-name">${escapeHtml(displayName)}</span>`}
+      <span class="tool-icon">${getToolIconSvg(name)}</span>
+      <span class="tui-name">${escapeHtml(displayName)}</span>
     </div>
     ${hasArgs ? `<div class="tc-item-args" style="display:none">${formatArgsHtml(args)}</div>` : ''}`;
 
-  if (hasArgs) {
-    attachCollapsible(strip, {
-      headerSelector: '.tc-item-header',
-      bodySelector:   '.tc-item-args',
-      chevronSelector: '.tc-item-chevron',
-    });
-  }
   updateGroupLabel(strip.closest('.block-group'));
   scrollToBottom();
 }
