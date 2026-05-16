@@ -135,16 +135,19 @@ export function tryGroupBlock(el) {
   }
 
   const prev = previousBlockSibling(el);
-  if (!prev) return;
 
-  if (prev.classList.contains('block-group')) {
+  if (prev?.classList.contains('block-group')) {
     prev.querySelector('.group-body')?.appendChild(el);
     updateGroupLabel(prev);
-  } else if (isGroupableBlock(prev)) {
+  } else if (prev && isGroupableBlock(prev)) {
     const group = createGroupBlock([prev, el]);
     row.insertBefore(group, prev);
     const body = group.querySelector('.group-body');
     body.appendChild(prev);
     body.appendChild(el);
+  } else {
+    const group = createGroupBlock([el]);
+    row.insertBefore(group, el);
+    group.querySelector('.group-body')?.appendChild(el);
   }
 }
