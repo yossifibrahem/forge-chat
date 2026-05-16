@@ -8,6 +8,7 @@ import {
   scrollToBottom, renderAllMessages,
   createThinkingBlock, updateThinkingBlock, finalizeThinkingBlock,
   createToolStrip, toolStripFinalize, toolStripSetApproval, toolStripSetRunning,
+  createProcessingIndicator, removeProcessingIndicator,
 } from './renderer.js';
 import { applyMarkdown } from './markdown.js';
 import { persistConversationFor, createNewConversation } from './conversations.js';
@@ -264,6 +265,7 @@ function syncFinalAssistantFooter(turn, ctx) {
 
 function finalizeAssistantAnswer(ctx, messages = null, displayLog = null) {
   if (!ctx?.turn) return;
+  removeProcessingIndicator();
 
   if (Array.isArray(messages)) ctx.turn.messages = messages;
   if (Array.isArray(displayLog)) ctx.turn.displayLog = displayLog;
@@ -311,6 +313,7 @@ export async function stopAssistantTurn() {
 
   turnCancelled = true;
   cancelAllToolApprovals();
+  removeProcessingIndicator();
   turnAbortController?.abort();
 
   const streamId = state.streamId;
@@ -357,11 +360,13 @@ async function processSSEEvent(raw, ctx) {
   const evt = JSON.parse(raw);
 
   if (evt.type === 'reasoning') {
+    removeProcessingIndicator();
     ctx.accReasoning += evt.content;
     if (!ctx.reasoningBodyEl && ctx.isVisible()) ctx.reasoningBodyEl = createThinkingBlock();
     if (ctx.reasoningBodyEl) updateThinkingBlock(ctx.reasoningBodyEl, ctx.accReasoning);
 
   } else if (evt.type === 'text') {
+    removeProcessingIndicator();
     if (ctx.reasoningBodyEl) {
       finalizeThinkingBlock(ctx.reasoningBodyEl, ctx.accReasoning);
       ctx.reasoningBodyEl = null;
@@ -375,6 +380,7 @@ async function processSSEEvent(raw, ctx) {
     }
 
   } else if (evt.type === 'tool_start') {
+    removeProcessingIndicator();
     // Keep indices aligned even when the user is viewing another chat.
     ctx.toolStartNames.push(evt.name);
     ctx.toolStrips.push(ctx.isVisible() ? createToolStrip(evt.name) : null);
@@ -427,6 +433,9 @@ async function processSSEEvent(raw, ctx) {
     ctx.reasoningFinalized = false;
     if (ctx.isVisible()) refreshFilePanel({ keepPreview: true }).catch(() => {});
 
+    // Show indicator while model processes the tool result.
+    if (ctx.isVisible()) createProcessingIndicator();
+
   } else if (evt.type === 'assistant_done') {
     finalizeAssistantAnswer(ctx, evt.messages, evt.displayLog);
 
@@ -434,6 +443,7 @@ async function processSSEEvent(raw, ctx) {
     if (ctx.turn) applyTurnTitle(ctx.turn, evt.title || ctx.turn.title);
 
   } else if (evt.type === 'error') {
+    removeProcessingIndicator();
     const el = ctx.getContentEl();
     if (el) el.innerHTML = `<span class="inline-error">Error: ${escapeHtml(evt.message)}</span>`;
     return false; // signal abort
@@ -458,6 +468,9 @@ async function runChatLoop(turn) {
   try {
     turnAbortController = new AbortController();
 
+    // Show processing dots immediately — the model hasn't produced any output yet.
+    createProcessingIndicator();
+
     const resp = await api.stream('/api/chat/stream', {
       model:     state.model || 'gpt-4o',
       temperature:  state.temperature ?? 0.7,
@@ -480,7 +493,7 @@ async function runChatLoop(turn) {
     if (!ctx.assistantDone) finalizeAssistantAnswer(ctx);
   } catch (err) {
     if (turnCancelled || err.name === 'AbortError') return ctx;
-
+    removeProcessingIndicator();
     const el = ctx.getContentEl();
     if (el) el.innerHTML = `<span class="inline-error">Network error: ${escapeHtml(err.message)}</span>`;
   }

@@ -66,6 +66,42 @@ export function finalizeThinkingBlock(bodyEl, fullText) {
   updateGroupLabel(block.closest('.block-group'));
 }
 
+// ── Processing indicator ──────────────────────────────────────────────────────
+// Shows a spinner + cycling dry-humor text while the model or a tool is working.
+
+const _phrases = ['proceesing', 'thinking', 'pondering', 'ruminating', 'cogitating', 'mulling it over', 'chewing on it', 'cooking up a response', 'brewing ideas', 'hatching a plan'];
+
+let _processingIndicatorEl = null;
+let _processingIntervalId  = null;
+
+export function createProcessingIndicator() {
+  if (_processingIndicatorEl) return;
+  const row = prepareAssistantRow();
+  const el = createElement('div', { className: 'processing-indicator' });
+  el.innerHTML = '<span></span><label></label>';
+  row.appendChild(el);
+  _processingIndicatorEl = el;
+
+  let idx = Math.floor(Math.random() * _phrases.length);
+  const label = el.querySelector('label');
+  label.textContent = _phrases[idx];
+
+  _processingIntervalId = setInterval(() => {
+    idx = (idx + 1) % _phrases.length;
+    if (label) label.textContent = _phrases[idx];
+  }, 2500);
+
+  scrollToBottom();
+}
+
+export function removeProcessingIndicator() {
+  if (!_processingIndicatorEl) return;
+  clearInterval(_processingIntervalId);
+  _processingIntervalId = null;
+  _processingIndicatorEl.remove();
+  _processingIndicatorEl = null;
+}
+
 export function appendThinkingBlock(reasoningText) {
   if (!reasoningText) return;
 

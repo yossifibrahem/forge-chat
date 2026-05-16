@@ -1,5 +1,35 @@
 /* Thinking blocks, tool-call strips, grouped tool blocks, and tool result panels. */
 
+/* ─── Processing indicator (model computing, no output yet) ─────────────────── */
+@keyframes processingSpin {
+  to { transform: rotate(360deg); }
+}
+
+.processing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+  margin: 2px 0 4px;
+}
+
+.processing-indicator span {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent-border);
+  border-top-color: var(--accent);
+  animation: processingSpin 0.8s linear infinite;
+}
+
+.processing-indicator label {
+  font-size: .73rem;
+  color: var(--text3);
+  transition: opacity 0.3s ease;
+}
+
 /* ─── Thinking and tool call strips ───────────────────────────────────────── */
 .thinking-block, .tool-strip { margin: 4px 0 6px; }
 :is(.thinking-header, .tr-summary, .group-header) { width: 100%; }
