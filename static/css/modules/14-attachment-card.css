@@ -36,11 +36,9 @@
   flex: 0 0 min(112px, calc(50vw - 44px));
   width: min(112px, calc(50vw - 44px));
   aspect-ratio: 1 / 1;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,.04) 0%, rgba(255,255,255,.01) 100%),
-              var(--surface2);
-
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  background: var(--surface2);
   overflow: hidden;
   transition: border-color var(--fast);
 }
@@ -123,14 +121,12 @@
   font-family: var(--font-mono);
 }
 
-/* ─── Overlay (gradient label layer for image cards) ─────────────────────── */
 .attachment-card-overlay {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   padding: 22px 8px 8px;
-  background: linear-gradient(180deg, transparent, rgba(0,0,0,.80));
   pointer-events: none;
 }
 
@@ -189,12 +185,6 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255,255,255,.06) 50%,
-    transparent 100%
-  );
   background-size: 200% 100%;
   animation: attachmentSweep 1.4s linear infinite;
 }
