@@ -1,13 +1,19 @@
 """Conversation CRUD routes."""
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, render_template, request
+import re
+
+from flask import Blueprint, jsonify, request
 
 import container_service
-import runtime_requirements
 import store
 
 blueprint = Blueprint("conversations", __name__)
+
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
 
 
 def _body() -> dict:
@@ -15,44 +21,9 @@ def _body() -> dict:
 
 
 def _bad_conv_id(conv_id: str):
-    import re
-    _UUID_RE = re.compile(
-        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-        re.IGNORECASE,
-    )
     if not _UUID_RE.match(conv_id):
         return jsonify({"error": "Not found"}), 404
     return None
-
-
-@blueprint.route("/")
-def index():
-    status = runtime_requirements.check_requirements()
-    if not status.ok:
-        return render_template("startup_requirements.html", status=status.as_dict())
-    return render_template("index.html")
-
-
-@blueprint.route("/api/startup/requirements", methods=["GET"])
-def startup_requirements():
-    status = runtime_requirements.check_requirements()
-    http_status = 200 if status.ok else 503
-    return jsonify(status.as_dict()), http_status
-
-
-@blueprint.route("/api/startup/build-sandbox-image", methods=["POST"])
-def build_sandbox_image():
-    status = runtime_requirements.build_sandbox_image()
-    http_status = 200 if status.ok else 500
-    if status.code in {"docker_unavailable", "docker_not_running"}:
-        http_status = 503
-    return jsonify(status.as_dict()), http_status
-
-
-@blueprint.route("/health")
-def health():
-    """Minimal liveness probe for container orchestrators and load balancers."""
-    return jsonify({"ok": True})
 
 
 @blueprint.route("/api/conversations", methods=["GET"])

@@ -136,3 +136,63 @@ def build_sandbox_image() -> RequirementStatus:
 
     log.info("[startup] sandbox image '%s' built successfully", image)
     return check_requirements()
+
+
+def build_sandbox_image_stream():
+    """Stream docker build output as (event, data) tuples for SSE.
+
+    Yields:
+        ("log",   {"line": str})          – one line of build output
+        ("done",  RequirementStatus.as_dict())  – build succeeded
+        ("error", RequirementStatus.as_dict())  – build failed
+    """
+    docker_status = check_docker()
+    if not docker_status.ok:
+        yield "error", docker_status.as_dict()
+        return
+
+    image = _image_name()
+    cmd = ["docker", "build", "--progress=plain", "-f", "Dockerfile.sandbox", "-t", image, "."]
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            cwd=PROJECT_ROOT,
+        )
+    except FileNotFoundError as exc:
+        yield "error", RequirementStatus(
+            ok=False,
+            code="docker_unavailable",
+            title="Docker is not available",
+            message="Please install/start Docker, then try again.",
+            action="retry",
+            image=image,
+            details=str(exc),
+        ).as_dict()
+        return
+
+    output_lines: list[str] = []
+    for line in proc.stdout:
+        line = line.rstrip("\n")
+        output_lines.append(line)
+        yield "log", {"line": line}
+
+    proc.wait()
+
+    if proc.returncode != 0:
+        yield "error", RequirementStatus(
+            ok=False,
+            code="sandbox_image_build_failed",
+            title="Sandbox image build failed",
+            message="The sandbox image could not be built. Check the details below, then try again.",
+            action="build",
+            image=image,
+            details="\n".join(output_lines[-50:]),
+        ).as_dict()
+        return
+
+    log.info("[startup] sandbox image '%s' built successfully", image)
+    yield "done", check_requirements().as_dict()

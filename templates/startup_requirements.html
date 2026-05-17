@@ -137,16 +137,39 @@ async function check() {
   render(await response.json());
 }
 
-async function buildImage() {
+function buildImage() {
   build.disabled = retry.disabled = true;
   build.textContent = 'Building...';
-  try {
-    const response = await fetch('/api/startup/build-sandbox-image', { method: 'POST' });
-    render(await response.json());
-  } finally {
+  details.hidden = false;
+  details.textContent = '';
+
+  const es = new EventSource('/api/startup/build-sandbox-image/stream');
+
+  es.addEventListener('log', e => {
+    const line = JSON.parse(e.data).line;
+    details.textContent += line + '\n';
+    details.scrollTop = details.scrollHeight;
+  });
+
+  es.addEventListener('done', e => {
+    es.close();
     build.disabled = retry.disabled = false;
     build.textContent = 'Build Sandbox Image';
-  }
+    render(JSON.parse(e.data));
+  });
+
+  es.addEventListener('error', e => {
+    es.close();
+    build.disabled = retry.disabled = false;
+    build.textContent = 'Build Sandbox Image';
+    // e.data is set on application-level error events; absent on transport errors
+    if (e.data) {
+      render(JSON.parse(e.data));
+    } else {
+      title.textContent = 'Build failed';
+      message.textContent = 'Connection to server lost. Check the terminal for details.';
+    }
+  });
 }
 
 retry.addEventListener('click', check);

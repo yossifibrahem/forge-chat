@@ -27,7 +27,8 @@ The app is intentionally lightweight: no database, no frontend framework, no bun
 .
 ├── app.py                         # Flask app factory, startup checks, CORS, shutdown cleanup
 ├── app_config.py                  # Server-side API provider config and API key storage
-├── routes.py                      # Thin blueprint registration shim — registers four route-group blueprints
+├── routes.py                      # Thin blueprint registration shim — registers five route-group blueprints
+├── routes_startup.py              # Setup screen, health, Docker/image checks, streaming sandbox build
 ├── routes_conversations.py        # Conversation CRUD, workspace path, container status, danger-delete
 ├── routes_chat.py                 # Streaming, cancel, approve, settings, advanced settings, model list
 ├── routes_mcp.py                  # MCP config, tool discovery, direct tool calls
@@ -185,7 +186,7 @@ Browser `localStorage` keys such as `lumen_settings`, `lumen_models`, and `lumen
 - Sets `MAX_CONTENT_LENGTH` from `LUMEN_MAX_CONTENT_LENGTH` to cap request body size globally.
 - Configures CORS from `LUMEN_CORS_ORIGINS`, defaulting to localhost origins.
 - Checks Docker and the sandbox image at startup, then lets the browser show friendly setup actions instead of exiting.
-- Registers all four route-group blueprints (`routes_conversations`, `routes_chat`, `routes_mcp`, `routes_files`) directly instead of a single monolithic blueprint.
+- Registers all five route-group blueprints (`routes_startup`, `routes_conversations`, `routes_chat`, `routes_mcp`, `routes_files`) directly instead of a single monolithic blueprint.
 - Calls stale container cleanup at startup.
 - Registers shutdown cleanup through `atexit` and `SIGTERM`, guarded against double execution.
 
@@ -204,11 +205,24 @@ Key behavior:
 
 ### `routes.py`
 
-`routes.py` is now a thin registration shim (32 lines). It imports the four route-group blueprints and exposes them so `app.py` can register them in one call. All streaming state that was previously module-level here now lives in `routes_chat.py`.
+`routes.py` is now a thin registration shim. It imports the five route-group blueprints and exposes them so `app.py` can register them in one call. All streaming state that was previously module-level here now lives in `routes_chat.py`.
+
+### `routes_startup.py`
+
+Owns all startup and runtime-environment routes. Kept separate from conversation routes because these routes are about the host environment, not user data.
+
+Key routes:
+- `GET /` — serves the app shell or the setup screen if requirements are unmet
+- `GET /health` — liveness probe for container orchestrators
+- `GET /api/startup/requirements` — current Docker/image requirement status (JSON)
+- `POST /api/startup/build-sandbox-image` — blocking build, returns JSON result
+- `GET /api/startup/build-sandbox-image/stream` — streams `docker build` output as SSE
+
+The SSE stream emits three event types: `log` (one build output line), `done` (build succeeded, data is `RequirementStatus` JSON), and `error` (build failed, data is `RequirementStatus` JSON). The frontend subscribes with `EventSource` and appends lines to the details panel in real time.
 
 ### `routes_conversations.py`
 
-Handles conversation CRUD, workspace path lookup, container status, and the danger-delete endpoint (122 lines).
+Handles conversation CRUD, workspace path lookup, container status, and the danger-delete endpoint.
 
 Key routes:
 - `GET/POST/PUT/DELETE /api/conversations` and `/api/conversations/<conv_id>`

@@ -2,6 +2,7 @@
 
 This module registers all route blueprints. Each route group lives in its
 own module:
+  routes_startup.py        – setup screen, health, Docker/image requirement checks
   routes_conversations.py  – conversation CRUD, workspace, container status
   routes_chat.py           – streaming chat, cancel, approve, settings, models
   routes_mcp.py            – MCP config, tool discovery, direct tool calls
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 from flask import Blueprint
 
+import routes_startup
 import routes_conversations
 import routes_chat
 import routes_mcp
@@ -26,6 +28,7 @@ blueprint = Blueprint("main", __name__)
 
 def _register_all(app):
     """Register every route blueprint onto the Flask app."""
+    app.register_blueprint(routes_startup.blueprint)
     app.register_blueprint(routes_conversations.blueprint)
     app.register_blueprint(routes_chat.blueprint)
     app.register_blueprint(routes_mcp.blueprint)

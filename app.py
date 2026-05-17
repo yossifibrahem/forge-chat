@@ -19,6 +19,7 @@ import routes_conversations
 import routes_chat
 import routes_mcp
 import routes_files
+import routes_startup
 import container_service
 import mcp_service
 import runtime_requirements
@@ -45,6 +46,7 @@ def create_app() -> Flask:
         if origin.strip()
     ]
     CORS(app, origins=allowed_origins)
+    app.register_blueprint(routes_startup.blueprint)
     app.register_blueprint(routes_conversations.blueprint)
     app.register_blueprint(routes_chat.blueprint)
     app.register_blueprint(routes_mcp.blueprint)

@@ -287,7 +287,8 @@ Click the stop button while a response is streaming. The server marks the stream
 |---|---|
 | `app.py` | Flask app factory; startup requirement status handling; CORS; shutdown cleanup |
 | `app_config.py` | Server-side API key and provider config storage; env var overrides; safe public metadata |
-| `routes.py` | Thin blueprint registration shim — registers the four route group blueprints |
+| `routes.py` | Thin blueprint registration shim — registers the five route group blueprints |
+| `routes_startup.py` | Setup screen, health probe, Docker/image requirement checks, streaming sandbox image build |
 | `routes_conversations.py` | Conversation CRUD, workspace path, container status, danger-delete |
 | `routes_chat.py` | Streaming, cancel, approve, settings, advanced settings, model list |
 | `routes_mcp.py` | MCP config, tool discovery, direct tool calls |
