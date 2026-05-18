@@ -103,6 +103,50 @@ Open **http://localhost:8080**, then open the settings panel to enter your API k
 
 > If Docker is not running or the `lumen-sandbox` image has not been built, the app starts and shows a setup screen with Retry / Build Sandbox Image actions.
 
+## Desktop app
+
+The desktop version is an Electron shell around the existing Flask app. It starts the Flask application object directly from `desktop/main.js` on a stable local port, opens a native window, and keeps the same `~/.lumen/` data folder, Docker sandbox image, MCP config, conversations, and workspaces. The stable port keeps browser `localStorage` on the same origin so saved UI settings survive app restarts. No Flask app source files need desktop-only changes.
+
+Install the Python dependencies first:
+
+```bash
+pip install -r requirements.txt
+```
+
+Install the desktop dependencies:
+
+```bash
+npm install
+```
+
+Run the desktop app in development:
+
+```bash
+npm run desktop
+```
+
+Build a packaged desktop app:
+
+```bash
+npm run dist
+```
+
+The packaged app still expects Python and the Python dependencies to be available on the machine. To force a specific Python executable, set `LUMEN_PYTHON` before launching the desktop app.
+
+Desktop mode uses port `38492` by default so local UI preferences stay attached to the same `127.0.0.1` origin. If that port is already used, close the other Lumen instance or set `LUMEN_DESKTOP_PORT` to another stable free port. The Electron wrapper controls the desktop host/port itself; `app.py` remains unchanged for normal web/server use.
+
+On Windows and Linux, Electron uses a frameless window and injects a quiet desktop-only title bar from `desktop/titlebar.css` and `desktop/titlebar.js`. The title bar keeps a small app icon on the left, centers the app name, and places the window controls on the right. Only the title bar background follows the app accent-dim color; the icon, centered title, divider, and hover states keep the same app theme colors as the rest of the UI. macOS keeps the native title bar.
+
+### App icon
+
+The desktop icon files live in `desktop/assets/`:
+
+- `icon.svg` is the editable source icon.
+- `icon.png` is used by the development window and Linux builds.
+- `icon.ico` is used by Windows packaged builds.
+
+After replacing the icon files, rerun `npm run dist` to create a new installer/executable with the updated icon. The browser favicon still comes from `static/favicon.svg`.
+
 ---
 
 ## Installation

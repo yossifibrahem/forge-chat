@@ -47,6 +47,8 @@ The app is intentionally lightweight: no database, no frontend framework, no bun
 ├── gunicorn.conf.py               # Single-worker/threaded production default
 ├── requirements.txt               # Flask, CORS, OpenAI SDK, MCP SDK
 ├── requirements-dev.txt           # Adds pytest and pytest-mock on top of requirements.txt
+├── package.json                    # Electron desktop scripts and packaging config
+├── desktop/                        # Electron main/preload process files for desktop app
 ├── pytest.ini                     # Test discovery config
 ├── README.md                      # User-facing project description and setup docs
 ├── agent.md                       # This agent/developer guide
@@ -98,6 +100,16 @@ The app is intentionally lightweight: no database, no frontend framework, no bun
 ```
 
 Root-level duplicate test files should not exist. In particular, keep `test_mcp_service.py` only under `tests/`.
+
+## Desktop wrapper
+
+The desktop app is intentionally a thin Electron shell. `desktop/main.js` imports the Flask `create_app()` factory through `python -c`, runs it on a stable localhost port (`38492` by default, overridable with `LUMEN_DESKTOP_PORT`), waits for `/health`, then loads the Flask UI in a `BrowserWindow`. This keeps desktop-specific host/port/reloader behavior out of `app.py`. The stable port is important because browser `localStorage` is origin-scoped; changing the port makes saved UI settings look reset. The Flask backend remains the source of truth for routing, persistence, MCP behavior, Docker checks, and startup setup screens.
+
+Keep desktop-specific code in `desktop/`. Avoid duplicating UI logic in Electron unless the behavior must be native-only. Electron sets a stable `userData` directory named `Lumen AI Chat` for browser storage across dev and packaged launches. The packaged app does not bundle Python; it uses `LUMEN_PYTHON`, a local `.venv`, or the system `python`/`python3`.
+
+Windows and Linux use a frameless Electron window plus an injected desktop-only title bar (`desktop/titlebar.css` and `desktop/titlebar.js`). The title bar provides a small app icon on the left, a centered app name, and window controls on the right. The injected chrome talks to Electron through the small preload bridge. Only the title bar background uses the Flask UI's existing `--accent-dim` token; the icon, centered title, divider, and hover states keep the normal app theme colors. This keeps desktop chrome visually aligned with the web app without changing Flask/main app files. macOS intentionally keeps the native window frame.
+
+Desktop icon assets are kept in `desktop/assets/`. `desktop/main.js` sets the runtime window icon from those files, and `package.json` points electron-builder at the same assets for packaged builds. If the brand icon changes, update the source SVG plus regenerated PNG/ICO files there; keep the web favicon in `static/favicon.svg` unless the browser tab icon should change too.
 
 ## How to run locally
 

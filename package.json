@@ -1,0 +1,50 @@
+{
+  "name": "lumen-ai-chat",
+  "version": "0.1.0",
+  "description": "Desktop wrapper for the Lumen AI Chat Flask app.",
+  "main": "desktop/main.js",
+  "private": true,
+  "scripts": {
+    "desktop": "electron .",
+    "start": "electron .",
+    "package": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.lumen.chat",
+    "productName": "Lumen AI Chat",
+    "asar": false,
+    "files": [
+      "desktop/**",
+      "desktop/assets/**",
+      "static/**",
+      "templates/**",
+      "*.py",
+      "Dockerfile.sandbox",
+      "requirements.txt",
+      "README.md",
+      "agent.md",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "desktop/assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "desktop/assets/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "desktop/assets/icon.png"
+    },
+    "icon": "desktop/assets/icon"
+  }
+}

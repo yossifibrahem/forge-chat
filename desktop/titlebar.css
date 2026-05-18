@@ -1,0 +1,170 @@
+:root {
+  --desktop-titlebar-h: 32px;
+}
+
+/* The app already sizes itself to one viewport and hides overflow. Keep the
+   page at exactly one viewport tall, then shrink only the desktop panes. */
+body.lumen-desktop-chrome {
+  padding-top: 0;
+}
+
+body.lumen-desktop-chrome #sidebar,
+body.lumen-desktop-chrome #main,
+body.lumen-desktop-chrome #file-panel {
+  height: calc(var(--vvh, 100dvh) - var(--desktop-titlebar-h));
+  margin-top: var(--desktop-titlebar-h);
+}
+
+body.lumen-desktop-chrome #file-panel {
+  /* Preserve the app's slide-out behavior while adding the title-bar offset. */
+  margin-right: calc(-1 * var(--file-panel-w));
+}
+
+body.lumen-desktop-chrome #file-panel.open {
+  margin-right: 0;
+}
+
+@media (max-width: 1024px) {
+  body.lumen-desktop-chrome #file-panel {
+    top: var(--desktop-titlebar-h);
+    height: calc(var(--vvh, 100dvh) - var(--desktop-titlebar-h));
+    margin-top: 0;
+    margin-right: 0;
+  }
+}
+
+#lumen-desktop-titlebar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: var(--desktop-titlebar-h);
+  z-index: 2147483647;
+  display: grid;
+  grid-template-columns: minmax(88px, 1fr) auto minmax(110px, 1fr);
+  align-items: center;
+  background: var(--desktop-titlebar-bg, var(--accent, #cc785c));
+  border-bottom: 1px solid var(--desktop-titlebar-border, rgba(0, 0, 0, .18));
+  color: var(--desktop-titlebar-fg, #1f1f1e);
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+#lumen-desktop-titlebar * {
+  box-sizing: border-box;
+}
+
+.lumen-titlebar-left {
+  grid-column: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 9px;
+  pointer-events: none;
+}
+
+.lumen-titlebar-app-icon {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: currentColor;
+  opacity: .92;
+}
+
+.lumen-titlebar-app-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.lumen-titlebar-title {
+  grid-column: 2;
+  min-width: 0;
+  max-width: min(260px, 42vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: currentColor;
+  font-family: var(--font-sans, Sora, ui-sans-serif, system-ui, sans-serif);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .01em;
+  pointer-events: none;
+}
+
+.lumen-titlebar-controls {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  padding: 0 7px;
+  -webkit-app-region: no-drag;
+}
+
+.lumen-titlebar-button {
+  width: 30px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm, 9px);
+  background: transparent;
+  color: currentColor;
+  opacity: .78;
+  outline: none;
+  cursor: default;
+  transition:
+    color var(--fast, .15s),
+    background var(--fast, .15s),
+    opacity var(--fast, .15s),
+    transform var(--fast, .15s);
+}
+
+.lumen-titlebar-button svg {
+  width: 11px;
+  height: 11px;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  fill: none;
+}
+
+.lumen-titlebar-button:hover,
+.lumen-titlebar-button:focus-visible {
+  background: var(--desktop-titlebar-button-hover, rgba(255, 255, 255, .14));
+  color: var(--desktop-titlebar-fg, #1f1f1e);
+  opacity: 1;
+}
+
+.lumen-titlebar-button:active {
+  transform: scale(.96);
+}
+
+.lumen-titlebar-button.close:hover,
+.lumen-titlebar-button.close:focus-visible {
+  background: var(--red, #c44e42);
+  color: #fff;
+  opacity: 1;
+}
+
+.lumen-titlebar-button .restore-icon {
+  display: none;
+}
+
+#lumen-desktop-titlebar.is-maximized .lumen-titlebar-button.maximize .maximize-icon {
+  display: none;
+}
+
+#lumen-desktop-titlebar.is-maximized .lumen-titlebar-button.maximize .restore-icon {
+  display: block;
+}
+
+html.no-transition #lumen-desktop-titlebar,
+html.no-transition #lumen-desktop-titlebar * {
+  transition: none !important;
+}
