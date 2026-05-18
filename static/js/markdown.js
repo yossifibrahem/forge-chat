@@ -31,10 +31,25 @@ function fileNameFromPath(path) {
 
 function decodeFileHref(rawHref) {
   const href = String(rawHref || '').trim();
+
+  // Relative /workspace/... path — the standard format.
   if (href.toLowerCase().startsWith('/workspace/')) {
     try { return decodeURIComponent(href).replace(/\\/g, '/'); } catch {}
     return href;
   }
+
+  // file:/workspace/..., file://workspace/..., or file:///workspace/... URI —
+  // models emit all three variants. Strip the scheme and any leading slashes
+  // beyond the one that belongs to /workspace/ itself, then decode.
+  if (/^file:/i.test(href)) {
+    // Remove "file:" then strip 0–2 extra leading slashes so we always get /workspace/...
+    const withoutScheme = href.slice('file:'.length).replace(/^\/\//, '');
+    if (withoutScheme.toLowerCase().startsWith('/workspace/')) {
+      try { return decodeURIComponent(withoutScheme).replace(/\\/g, '/'); } catch {}
+      return withoutScheme;
+    }
+  }
+
   return '';
 }
 
